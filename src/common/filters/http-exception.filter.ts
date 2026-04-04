@@ -20,8 +20,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
 
     const message =
-      typeof exceptionResponse === 'object' && 'message' in exceptionResponse
-        ? (exceptionResponse as any).message
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'message' in exceptionResponse
+        ? (exceptionResponse as Record<string, unknown>)['message']
         : exceptionResponse;
 
     this.logger.warn(`${request.method} ${request.url} → ${status}`);

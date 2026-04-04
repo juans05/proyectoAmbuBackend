@@ -55,8 +55,11 @@ IMPORTANTE: No reemplazas atención médica profesional. Tu rol es orientar mien
           },
         ),
       );
+      const responseData = response.data as {
+        content?: Array<{ text?: string }>;
+      };
       const reply =
-        response.data?.content?.[0]?.text ?? 'No pude procesar tu consulta.';
+        responseData?.content?.[0]?.text ?? 'No pude procesar tu consulta.';
       return { reply };
     } catch (error) {
       this.logger.error('Claude API error', error);

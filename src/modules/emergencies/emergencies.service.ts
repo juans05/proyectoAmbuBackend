@@ -116,14 +116,14 @@ export class EmergenciesService {
     return this.emergencyRepo.save(emergency);
   }
 
-  async accept(id: string, conductorUserId: string) {
+  async accept(id: string) {
     const emergency = await this.findOne(id);
     emergency.status = EmergencyStatus.ON_ROUTE;
     emergency.assignedAt = new Date();
     return this.emergencyRepo.save(emergency);
   }
 
-  async arrived(id: string, conductorUserId: string) {
+  async arrived(id: string) {
     const emergency = await this.findOne(id);
     emergency.status = EmergencyStatus.ARRIVED;
     emergency.arrivedAt = new Date();

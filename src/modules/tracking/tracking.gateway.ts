@@ -9,6 +9,16 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+
+interface JwtPayload {
+  sub: string;
+  role: string;
+}
+
+interface SocketData {
+  userId: string;
+  role: string;
+}
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -50,13 +60,18 @@ export class TrackingGateway
 
   // ─── Conexión con JWT en handshake ──────────────────────────────────────────
 
-  async handleConnection(client: Socket) {
+  handleConnection(client: Socket): void {
     try {
       // Extraer token del handshake: auth.token (Bearer xxx) o headers.authorization
-      const rawToken =
-        client.handshake.auth?.token || client.handshake.headers?.authorization;
+      const auth = client.handshake.auth as Record<string, string | undefined>;
+      const headers = client.handshake.headers as Record<
+        string,
+        string | undefined
+      >;
+      const rawToken: string | undefined =
+        auth['token'] ?? headers['authorization'];
 
-      const token = rawToken?.startsWith('Bearer ')
+      const token: string | undefined = rawToken?.startsWith('Bearer ')
         ? rawToken.slice(7)
         : rawToken;
 
@@ -67,7 +82,7 @@ export class TrackingGateway
       }
 
       const secret = this.configService.get<string>('jwt.accessSecret');
-      const payload = this.jwtService.verify(token, { secret });
+      const payload = this.jwtService.verify<JwtPayload>(token, { secret });
 
       if (!payload?.sub) {
         client.disconnect(true);
@@ -75,8 +90,8 @@ export class TrackingGateway
       }
 
       // Guardar userId en el socket para uso posterior
-      client.data.userId = payload.sub;
-      client.data.role = payload.role;
+      const data: SocketData = { userId: payload.sub, role: payload.role };
+      client.data = data;
 
       // Si el conductor reconectó antes de que expirara el grace period, cancelarlo
       if (this.disconnectTimers.has(payload.sub)) {
@@ -93,7 +108,7 @@ export class TrackingGateway
       this.logger.debug(
         `Cliente conectado: ${client.id} (userId: ${payload.sub})`,
       );
-    } catch (err) {
+    } catch {
       this.logger.warn(`Conexión rechazada (token inválido): ${client.id}`);
       client.disconnect(true);
     }
@@ -101,7 +116,7 @@ export class TrackingGateway
 
   // ─── Desconexión con grace period de 30s para conductores ───────────────────
 
-  handleDisconnect(client: Socket) {
+  handleDisconnect(client: Socket): void {
     const userId = this.socketToUser.get(client.id);
     this.socketToUser.delete(client.id);
 
@@ -110,7 +125,7 @@ export class TrackingGateway
     this.logger.debug(`Cliente desconectado: ${client.id} (userId: ${userId})`);
 
     // Grace period: esperar 30s antes de marcar offline (tolera reconexiones rápidas)
-    const timer = setTimeout(async () => {
+    const markOffline = async (): Promise<void> => {
       this.disconnectTimers.delete(userId);
 
       // Verificar si el usuario reconectó en otro socket
@@ -139,8 +154,11 @@ export class TrackingGateway
           err,
         );
       }
-    }, 30_000);
+    };
 
+    const timer = setTimeout(() => {
+      void markOffline();
+    }, 30_000);
     this.disconnectTimers.set(userId, timer);
   }
 
@@ -158,7 +176,7 @@ export class TrackingGateway
     },
     @ConnectedSocket() client: Socket,
   ) {
-    const userId: string = client.data?.userId;
+    const userId: string = (client.data as SocketData)?.userId;
     if (!userId) return;
 
     // Throttle: máx 1 update por segundo por conductor
@@ -214,7 +232,7 @@ export class TrackingGateway
     @MessageBody() data: { emergencyId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(`emergency_${data.emergencyId}`);
+    void client.join(`emergency_${data.emergencyId}`);
     this.logger.debug(
       `Cliente ${client.id} unido a emergency_${data.emergencyId}`,
     );
@@ -227,7 +245,7 @@ export class TrackingGateway
     @MessageBody() data: { emergencyId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.leave(`emergency_${data.emergencyId}`);
+    void client.leave(`emergency_${data.emergencyId}`);
     this.logger.debug(
       `Cliente ${client.id} salió de emergency_${data.emergencyId}`,
     );

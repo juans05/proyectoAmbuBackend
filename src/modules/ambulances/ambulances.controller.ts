@@ -16,6 +16,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
 import { GeoQueryDto } from '../../common/dto/geo-query.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 import { AmbulancesService } from './ambulances.service';
 import { CreateAmbulanceDto } from './dto/create-ambulance.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
@@ -37,8 +38,17 @@ export class AmbulancesController {
 
   @Get()
   @Roles(UserRole.BUSINESS, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Mis ambulancias [BUSINESS]' })
-  findMine(@CurrentUser() user: User & { companyId?: string }) {
+  @ApiOperation({
+    summary: 'Listar ambulancias [ADMIN: todas | BUSINESS: por empresa]',
+  })
+  findAll(
+    @CurrentUser() user: User & { companyId?: string },
+    @Query() pagination: PaginationDto,
+    @Query('status') status?: string,
+  ) {
+    if (user.role === UserRole.ADMIN) {
+      return this.ambulancesService.findAllAdmin(pagination, status);
+    }
     return this.ambulancesService.findByCompany(user.companyId ?? '');
   }
 

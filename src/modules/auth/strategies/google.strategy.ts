@@ -20,11 +20,15 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   }
 
   async validate(
-    accessToken: string,
-    refreshToken: string,
-    profile: any,
+    _accessToken: string,
+    _refreshToken: string,
+    profile: {
+      name: { givenName: string; familyName: string };
+      emails: Array<{ value: string }>;
+      photos: Array<{ value: string }>;
+    },
     done: VerifyCallback,
-  ): Promise<any> {
+  ): Promise<void> {
     const { name, emails, photos } = profile;
     const user = await this.authService.findOrCreateSocialUser({
       email: emails[0].value,

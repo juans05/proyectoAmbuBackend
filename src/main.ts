@@ -12,6 +12,7 @@ async function bootstrap() {
 
   // Security and performance
   app.use(helmet());
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   app.use(compression());
   app.enableCors();
 
@@ -45,4 +46,4 @@ async function bootstrap() {
   logger.log(`Application is running on: http://localhost:${port}`);
   logger.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
-bootstrap();
+void bootstrap();

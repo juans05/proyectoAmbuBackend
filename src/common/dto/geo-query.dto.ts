@@ -17,7 +17,7 @@ export class GeoQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(0.1)
-  @Max(50)
-  radius?: number = 5; // km
+  @Min(1)
+  @Max(100000)
+  radius?: number = 5000; // metros (default 5km)
 }

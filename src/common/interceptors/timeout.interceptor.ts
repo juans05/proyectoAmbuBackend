@@ -10,7 +10,10 @@ import { catchError, timeout } from 'rxjs/operators';
 
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(
+    _context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<unknown> {
     return next.handle().pipe(
       timeout(30_000),
       catchError((err) => {
@@ -19,7 +22,7 @@ export class TimeoutInterceptor implements NestInterceptor {
             () => new RequestTimeoutException('Tiempo de espera agotado'),
           );
         }
-        return throwError(() => err);
+        return throwError(() => err as Error);
       }),
     );
   }

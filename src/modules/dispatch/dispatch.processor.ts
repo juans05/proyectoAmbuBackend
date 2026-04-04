@@ -6,6 +6,20 @@ import { DISPATCH_QUEUE } from '../../common/constants/queues.constant';
 import { SocketEvents } from '../../common/constants/socket-events.constant';
 import { Ambulance } from '../ambulances/entities/ambulance.entity';
 import { Emergency } from '../emergencies/entities/emergency.entity';
+import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
+import { EmergencyStatus } from '../../common/enums/emergency-status.enum';
+
+interface AmbulanceQueryRow {
+  id: string;
+  conductorId: string;
+  locationLat: number;
+  locationLng: number;
+  plate: string;
+  type: string;
+  fcmToken: string | null;
+  conductor_name: string;
+  distance_meters: number;
+}
 import { NotificationsService } from '../notifications/notifications.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { GoogleMapsService } from '../../common/utils/google-maps.service';
@@ -33,11 +47,11 @@ export class DispatchProcessor {
       where: { id: emergencyId },
       relations: ['user'],
     });
-    if (!emergency || emergency.status !== 'pending') return;
+    if (!emergency || emergency.status !== EmergencyStatus.PENDING) return;
 
     // 2. Buscar ambulancia más cercana con PostGIS
     // CRÍTICO: PostGIS usa (lng, lat) — NO (lat, lng)
-    const result = await this.dataSource.query(
+    const result = await this.dataSource.query<AmbulanceQueryRow[]>(
       `
       SELECT
         a.id,
@@ -84,7 +98,7 @@ export class DispatchProcessor {
       }
       // Notificar al usuario que no hay ambulancias disponibles
       await this.emergencyRepo.update(emergencyId, {
-        status: 'cancelled' as any,
+        status: EmergencyStatus.CANCELLED,
         cancelReason: 'Sin ambulancias disponibles',
       });
       this.trackingGateway.emitToEmergency(
@@ -100,7 +114,7 @@ export class DispatchProcessor {
     // 3. Calcular ETA real con Google Maps
     let eta = Math.ceil(ambulance.distance_meters / 500); // fallback: 500m/min
     try {
-      eta = await this.googleMapsService.getETA(
+      eta = this.googleMapsService.getETA(
         { lat: ambulance.locationLat, lng: ambulance.locationLng },
         { lat: emergency.userLat, lng: emergency.userLng },
       );
@@ -111,7 +125,7 @@ export class DispatchProcessor {
     // 4. Asignar ambulancia — transacción para evitar doble asignación
     await this.dataSource.transaction(async (manager) => {
       // Bloquear fila para evitar condición de carrera
-      const locked = await manager.query(
+      const locked = await manager.query<Array<{ id: string }>>(
         `
         SELECT id FROM ambulances WHERE id = $1 AND status = 'available'
         FOR UPDATE SKIP LOCKED
@@ -124,11 +138,11 @@ export class DispatchProcessor {
       }
 
       await manager.update(Ambulance, ambulance.id, {
-        status: 'on_route' as any,
+        status: AmbulanceStatus.ON_ROUTE,
       });
       await manager.update(Emergency, emergencyId, {
         ambulanceId: ambulance.id,
-        status: 'assigned' as any,
+        status: EmergencyStatus.ASSIGNED,
         estimatedArrivalMinutes: eta,
         assignedAt: new Date(),
       });

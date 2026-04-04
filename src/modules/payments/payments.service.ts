@@ -91,7 +91,8 @@ export class PaymentsService {
         ),
       );
 
-      if (response.data.object !== 'charge') {
+      const chargeData = response.data as { object?: string; id?: string };
+      if (chargeData.object !== 'charge') {
         throw new Error('Error en el procesamiento del pago con Culqi');
       }
 
@@ -108,17 +109,21 @@ export class PaymentsService {
         companyAmount: +(amount * (1 - commission)).toFixed(2),
         status: 'paid',
         paymentMethod: 'card',
-        culqiChargeId: response.data.id, // Guardar ID de Culqi
+        culqiChargeId: chargeData.id,
       });
 
       return this.paymentRepo.save(payment);
-    } catch (error) {
+    } catch (err) {
+      const error = err as {
+        response?: { data?: { user_message?: string } };
+        message?: string;
+      };
       this.logger.error(
         'Culqi API error',
-        error.response?.data || error.message,
+        error.response?.data ?? error.message,
       );
       throw new BadRequestException(
-        error.response?.data?.user_message ||
+        error.response?.data?.user_message ??
           'No se pudo procesar el pago con la tarjeta',
       );
     }
@@ -142,11 +147,15 @@ export class PaymentsService {
       .addSelect('SUM(p.platformFee)', 'totalCommissions')
       .addSelect('COUNT(*)', 'count')
       .where('p.status = :status', { status: 'paid' })
-      .getRawOne();
+      .getRawOne<{
+        totalRevenue: string;
+        totalCommissions: string;
+        count: string;
+      }>();
     return {
-      totalRevenue: +result.totalRevenue || 0,
-      totalCommissions: +result.totalCommissions || 0,
-      count: +result.count || 0,
+      totalRevenue: +(result?.totalRevenue ?? 0),
+      totalCommissions: +(result?.totalCommissions ?? 0),
+      count: +(result?.count ?? 0),
     };
   }
 }

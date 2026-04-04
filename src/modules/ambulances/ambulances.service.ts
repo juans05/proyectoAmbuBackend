@@ -10,7 +10,11 @@ import { CreateAmbulanceDto } from './dto/create-ambulance.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
 import { GeoQueryDto } from '../../common/dto/geo-query.dto';
-import { kmToMeters } from '../../common/utils/geo.utils';
+import { PaginationDto } from '../../common/dto/pagination.dto';
+import {
+  paginate,
+  paginationToSkipTake,
+} from '../../common/utils/pagination.utils';
 
 @Injectable()
 export class AmbulancesService {
@@ -28,6 +32,23 @@ export class AmbulancesService {
       throw new ConflictException('Ya existe una ambulancia con esa placa');
     const ambulance = this.ambulanceRepo.create(dto);
     return this.ambulanceRepo.save(ambulance);
+  }
+
+  async findAllAdmin(pagination: PaginationDto, status?: string) {
+    const { skip, take } = paginationToSkipTake(
+      pagination.page!,
+      pagination.limit!,
+    );
+    const where: Record<string, string> = {};
+    if (status) where['status'] = status;
+    const [data, total] = await this.ambulanceRepo.findAndCount({
+      where,
+      relations: ['company', 'conductor'],
+      order: { createdAt: 'DESC' },
+      skip,
+      take,
+    });
+    return paginate(data, total, pagination.page!, pagination.limit!);
   }
 
   async findByCompany(companyId: string): Promise<Ambulance[]> {
@@ -84,7 +105,9 @@ export class AmbulancesService {
   async getConductorDayStats(
     conductorId: string,
   ): Promise<{ services: number; totalAmount: number }> {
-    const result = await this.dataSource.query(
+    const result = await this.dataSource.query<
+      Array<{ services: string; total_amount: string }>
+    >(
       `
       SELECT
         COUNT(*) AS services,
@@ -98,13 +121,13 @@ export class AmbulancesService {
       [conductorId],
     );
     return {
-      services: +result[0]?.services || 0,
-      totalAmount: +result[0]?.total_amount || 0,
+      services: +(result[0]?.services ?? 0),
+      totalAmount: +(result[0]?.total_amount ?? 0),
     };
   }
 
   async findNearby(query: GeoQueryDto): Promise<Ambulance[]> {
-    const radiusMeters = kmToMeters(query.radius ?? 5);
+    const radiusMeters = query.radius ?? 5000;
     return this.dataSource.query(
       `
       SELECT

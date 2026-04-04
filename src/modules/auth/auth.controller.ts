@@ -7,7 +7,6 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { HttpService } from '@nestjs/axios';
@@ -18,6 +17,23 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleAuthDto, FacebookAuthDto } from './dto/social-auth.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
+
+interface GoogleTokenInfo {
+  email?: string;
+  name?: string;
+  picture?: string;
+}
+
+interface FacebookUserInfo {
+  id?: string;
+  name?: string;
+  email?: string;
+  picture?: { data?: { url?: string } };
+}
+
+interface JwtDecoded {
+  sub?: string;
+}
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -53,8 +69,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Renovar access token con refresh token' })
   async refresh(@Body() dto: RefreshTokenDto) {
-    const payload = this.authService['jwtService'].decode(dto.refreshToken);
-    return this.authService.refresh(payload?.sub, dto.refreshToken);
+    const payload = this.authService['jwtService'].decode<JwtDecoded>(
+      dto.refreshToken,
+    );
+    return this.authService.refresh(payload?.sub ?? '', dto.refreshToken);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -84,7 +102,7 @@ export class AuthController {
     try {
       // Verificar idToken contra Google tokeninfo endpoint
       const { data } = await firstValueFrom(
-        this.httpService.get(
+        this.httpService.get<GoogleTokenInfo>(
           `https://oauth2.googleapis.com/tokeninfo?id_token=${dto.idToken}`,
         ),
       );
@@ -93,13 +111,14 @@ export class AuthController {
 
       const socialUser = await this.authService.findOrCreateSocialUser({
         email: data.email,
-        name: data.name || data.email.split('@')[0],
+        name: data.name ?? data.email.split('@')[0],
         avatarUrl: data.picture,
         provider: 'google',
       });
       return this.authService.loginSocial(socialUser);
-    } catch (err: any) {
-      if (err?.status) throw err;
+    } catch (err) {
+      const e = err as { status?: number };
+      if (e?.status) throw err;
       throw new UnauthorizedException('Token de Google inválido o expirado');
     }
   }
@@ -112,7 +131,7 @@ export class AuthController {
     try {
       // Verificar accessToken contra Graph API
       const { data } = await firstValueFrom(
-        this.httpService.get(
+        this.httpService.get<FacebookUserInfo>(
           `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${dto.accessToken}`,
         ),
       );
@@ -120,14 +139,15 @@ export class AuthController {
         throw new UnauthorizedException('Token de Facebook inválido');
 
       const socialUser = await this.authService.findOrCreateSocialUser({
-        email: data.email || `fb_${data.id}@ambugo.com`,
-        name: data.name || `Usuario FB ${data.id}`,
+        email: data.email ?? `fb_${data.id}@ambugo.com`,
+        name: data.name ?? `Usuario FB ${data.id}`,
         avatarUrl: data.picture?.data?.url,
         provider: 'facebook',
       });
       return this.authService.loginSocial(socialUser);
-    } catch (err: any) {
-      if (err?.status) throw err;
+    } catch (err) {
+      const e = err as { status?: number };
+      if (e?.status) throw err;
       throw new UnauthorizedException('Token de Facebook inválido o expirado');
     }
   }

@@ -7,6 +7,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Company } from './entities/company.entity';
 import { CreateCompanyDto } from './dto/create-company.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
+import {
+  paginate,
+  paginationToSkipTake,
+} from '../../common/utils/pagination.utils';
 
 @Injectable()
 export class CompaniesService {
@@ -30,6 +35,27 @@ export class CompaniesService {
       where: { isVerified: true },
       order: { name: 'ASC' },
     });
+  }
+
+  async findAllAdmin(pagination: PaginationDto, filter?: string) {
+    const { skip, take } = paginationToSkipTake(
+      pagination.page!,
+      pagination.limit!,
+    );
+    const where: { isVerified?: boolean } = {};
+    if (filter === 'verified') where.isVerified = true;
+    if (filter === 'pending') where.isVerified = false;
+    const [data, total] = await this.companyRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip,
+      take,
+    });
+    return paginate(data, total, pagination.page!, pagination.limit!);
+  }
+
+  async suspend(id: string): Promise<Company> {
+    return this.update(id, { isVerified: false });
   }
 
   async findOne(id: string): Promise<Company> {

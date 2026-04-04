@@ -22,7 +22,8 @@ export class JwtRefreshStrategy extends PassportStrategy(
   }
 
   async validate(req: Request, payload: { sub: string }) {
-    const refreshToken = req.body?.refreshToken;
+    const body = req.body as { refreshToken?: string };
+    const refreshToken = body.refreshToken;
     const user = await this.usersService.findById(payload.sub);
     if (!user || !user.refreshToken) throw new UnauthorizedException();
     return { ...user, refreshToken };

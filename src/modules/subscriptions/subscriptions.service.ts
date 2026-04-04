@@ -8,6 +8,11 @@ import { Repository } from 'typeorm';
 import { Subscription } from './entities/subscription.entity';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UsersService } from '../users/users.service';
+import { PaginationDto } from '../../common/dto/pagination.dto';
+import {
+  paginate,
+  paginationToSkipTake,
+} from '../../common/utils/pagination.utils';
 
 const PLAN_PRICES: Record<string, number> = {
   protegido: 29.9,
@@ -75,6 +80,36 @@ export class SubscriptionsService {
 
   async findActive(userId: string): Promise<Subscription | null> {
     return this.subRepo.findOne({ where: { userId, status: 'active' } });
+  }
+
+  async findAllAdmin(pagination: PaginationDto, status?: string) {
+    const { skip, take } = paginationToSkipTake(
+      pagination.page!,
+      pagination.limit!,
+    );
+    const where: { status?: string } = {};
+    if (status) where.status = status;
+    const [data, total] = await this.subRepo.findAndCount({
+      where,
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      skip,
+      take,
+    });
+    // Map to frontend-expected shape
+    const mapped = data.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      planName: s.plan,
+      status: s.status,
+      startDate: s.startDate,
+      endDate: s.endDate,
+      amount: s.monthlyAmount,
+      user: s.user
+        ? { id: s.user.id, name: s.user.name, email: s.user.email }
+        : undefined,
+    }));
+    return paginate(mapped, total, pagination.page!, pagination.limit!);
   }
 
   async cancel(userId: string): Promise<void> {

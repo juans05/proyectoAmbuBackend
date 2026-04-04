@@ -10,10 +10,10 @@ export class GoogleMapsService {
     this.apiKey = this.configService.get<string>('GOOGLE_MAPS_API_KEY') || '';
   }
 
-  async getETA(
+  getETA(
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
-  ): Promise<number> {
+  ): number {
     // Aquí iría la llamada real a Google Distance Matrix
     // Por ahora, usamos un fallback de 500m/min como especifica el prompt
     const distance = this.calculateDistance(origin, destination);

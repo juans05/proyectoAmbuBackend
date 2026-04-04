@@ -81,6 +81,15 @@ export class Emergency {
   @Column({ nullable: true })
   estimatedArrivalMinutes: number;
 
+  @Column({ type: 'text', nullable: true })
+  suggestedRoutePolyline: string; // Polilínea codificada de la ruta teórica
+
+  @Column({ type: 'int', nullable: true })
+  actualDurationSeconds: number; // Tiempo real que tomó llegar
+
+  @Column({ type: 'int', nullable: true })
+  timeDifferenceSeconds: number; // Diferencia (IA): Real - Estimado
+
   @Column({ nullable: true })
   assignedAt: Date;
 

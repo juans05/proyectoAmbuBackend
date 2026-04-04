@@ -18,6 +18,7 @@ interface JwtPayload {
 interface SocketData {
   userId: string;
   role: string;
+  ambulanceId?: string;
 }
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -27,6 +28,7 @@ import Redis from 'ioredis';
 import { Ambulance } from '../ambulances/entities/ambulance.entity';
 import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
 import { SocketEvents } from '../../common/constants/socket-events.constant';
+import { RouteLog } from './entities/route-log.entity';
 
 @WebSocketGateway({
   namespace: '/tracking',
@@ -56,6 +58,8 @@ export class TrackingGateway
     private readonly redisClient: Redis,
     @InjectRepository(Ambulance)
     private readonly ambulanceRepo: Repository<Ambulance>,
+    @InjectRepository(RouteLog)
+    private readonly routeLogRepo: Repository<RouteLog>,
   ) {}
 
   // ─── Conexión con JWT en handshake ──────────────────────────────────────────
@@ -91,6 +95,16 @@ export class TrackingGateway
 
       // Guardar userId en el socket para uso posterior
       const data: SocketData = { userId: payload.sub, role: payload.role };
+
+      // Si es conductor, precargar su ambulanceId para ahorrar queries luego
+      if (payload.role === 'conductor') {
+        void this.ambulanceRepo
+          .findOne({ where: { conductorId: payload.sub } })
+          .then((amb) => {
+            if (amb) data.ambulanceId = amb.id;
+          });
+      }
+
       client.data = data;
 
       // Si el conductor reconectó antes de que expirara el grace period, cancelarlo
@@ -201,9 +215,28 @@ export class TrackingGateway
         })
         .where('"conductorId" = :userId', { userId })
         .execute();
+
+      // IA: Si hay una emergencia activa, guardar en el historial (breadcrumb)
+      if (data.emergencyId) {
+        const ambulanceId = (client.data as SocketData)?.ambulanceId;
+        if (ambulanceId) {
+          void this.routeLogRepo.save({
+            emergencyId: data.emergencyId,
+            ambulanceId,
+            lat: data.lat,
+            lng: data.lng,
+            heading: data.heading,
+            speed: data.speed,
+            location: {
+              type: 'Point',
+              coordinates: [data.lng, data.lat],
+            },
+          });
+        }
+      }
     } catch (err) {
       this.logger.error(
-        `Error al persistir ubicación del conductor ${userId}`,
+        `Error al persistir ubicación/historial del conductor ${userId}`,
         err,
       );
     }

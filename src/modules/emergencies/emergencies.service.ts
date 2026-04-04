@@ -12,12 +12,15 @@ import { DispatchService } from '../dispatch/dispatch.service';
 import { CreateEmergencyDto } from './dto/create-emergency.dto';
 import { CompleteEmergencyDto } from './dto/complete-emergency.dto';
 
+import { RouteAnalyticsService } from '../tracking/route-analytics.service';
+
 @Injectable()
 export class EmergenciesService {
   constructor(
     @InjectRepository(Emergency)
     private readonly emergencyRepo: Repository<Emergency>,
     private readonly dispatchService: DispatchService,
+    private readonly routeAnalyticsService: RouteAnalyticsService,
   ) {}
 
   async create(userId: string, data: CreateEmergencyDto) {
@@ -142,6 +145,11 @@ export class EmergenciesService {
     // platformFee: 12%, companyAmount: 88%
     emergency.platformFee = +(data.totalAmount * 0.12).toFixed(2);
     emergency.companyAmount = +(data.totalAmount * 0.88).toFixed(2);
-    return this.emergencyRepo.save(emergency);
+    const saved = await this.emergencyRepo.save(emergency);
+
+    // IA: Analizar ruta de forma asíncrona al terminar la emergencia
+    void this.routeAnalyticsService.analyzeEmergencyRoute(id);
+
+    return saved;
   }
 }

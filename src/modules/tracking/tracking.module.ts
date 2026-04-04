@@ -4,11 +4,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import Redis from 'ioredis';
 import { TrackingGateway } from './tracking.gateway';
+import { RouteAnalyticsService } from './route-analytics.service';
 import { Ambulance } from '../ambulances/entities/ambulance.entity';
+import { Emergency } from '../emergencies/entities/emergency.entity';
+import { RouteLog } from './entities/route-log.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Ambulance]),
+    TypeOrmModule.forFeature([Ambulance, RouteLog, Emergency]),
     ConfigModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -20,6 +23,7 @@ import { Ambulance } from '../ambulances/entities/ambulance.entity';
   ],
   providers: [
     TrackingGateway,
+    RouteAnalyticsService,
     {
       provide: Redis,
       inject: [ConfigService],
@@ -32,6 +36,6 @@ import { Ambulance } from '../ambulances/entities/ambulance.entity';
         }),
     },
   ],
-  exports: [TrackingGateway],
+  exports: [TrackingGateway, RouteAnalyticsService],
 })
 export class TrackingModule {}

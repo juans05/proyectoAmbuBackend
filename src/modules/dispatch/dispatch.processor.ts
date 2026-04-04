@@ -111,13 +111,16 @@ export class DispatchProcessor {
 
     const ambulance = result[0];
 
-    // 3. Calcular ETA real con Google Maps
+    // 3. Calcular ruta real y ETA con Google Maps
     let eta = Math.ceil(ambulance.distance_meters / 500); // fallback: 500m/min
+    let polyline = '';
     try {
-      eta = this.googleMapsService.getETA(
+      const directions = await this.googleMapsService.getDirections(
         { lat: ambulance.locationLat, lng: ambulance.locationLng },
         { lat: emergency.userLat, lng: emergency.userLng },
       );
+      eta = Math.ceil(directions.durationSeconds / 60);
+      polyline = directions.polyline;
     } catch {
       /* usar fallback si Google Maps falla */
     }
@@ -144,6 +147,7 @@ export class DispatchProcessor {
         ambulanceId: ambulance.id,
         status: EmergencyStatus.ASSIGNED,
         estimatedArrivalMinutes: eta,
+        suggestedRoutePolyline: polyline,
         assignedAt: new Date(),
       });
     });
@@ -156,6 +160,7 @@ export class DispatchProcessor {
         data: {
           type: 'NEW_EMERGENCY',
           emergencyId,
+          polyline, // Nueva: ruta teórica de Google
           userLat: String(emergency.userLat),
           userLng: String(emergency.userLng),
           userName: emergency.user.name,
@@ -172,6 +177,7 @@ export class DispatchProcessor {
       plate: ambulance.plate,
       type: ambulance.type,
       estimatedArrivalMinutes: eta,
+      polyline, // Incluir la ruta para que el cliente la dibuje
       ambulanceLat: ambulance.locationLat,
       ambulanceLng: ambulance.locationLng,
     });

@@ -6,10 +6,11 @@ import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { Emergency } from '../emergencies/entities/emergency.entity';
 import { Subscription } from '../subscriptions/entities/subscription.entity';
+import { Plan } from '../plans/entities/plan.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Payment, Emergency, Subscription]),
+    TypeOrmModule.forFeature([Payment, Emergency, Subscription, Plan]),
     HttpModule,
   ],
   providers: [PaymentsService],

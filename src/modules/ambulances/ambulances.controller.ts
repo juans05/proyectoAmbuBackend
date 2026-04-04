@@ -48,6 +48,30 @@ export class AmbulancesController {
     return this.ambulancesService.findNearby(query);
   }
 
+  @Get('conductor/mine')
+  @Roles(UserRole.CONDUCTOR)
+  @ApiOperation({ summary: 'Mi ambulancia asignada [CONDUCTOR]' })
+  myConductorAmbulance(@CurrentUser() user: User) {
+    return this.ambulancesService.findByConductor(user.id);
+  }
+
+  @Get('conductor/stats')
+  @Roles(UserRole.CONDUCTOR)
+  @ApiOperation({ summary: 'Estadísticas del día [CONDUCTOR]' })
+  myConductorStats(@CurrentUser() user: User) {
+    return this.ambulancesService.getConductorDayStats(user.id);
+  }
+
+  @Put('conductor/status')
+  @Roles(UserRole.CONDUCTOR)
+  @ApiOperation({ summary: 'Cambiar mi estado de disponibilidad [CONDUCTOR]' })
+  updateConductorStatus(
+    @CurrentUser() user: User,
+    @Body('status') status: AmbulanceStatus,
+  ) {
+    return this.ambulancesService.updateStatusByConductor(user.id, status);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de ambulancia' })
   findOne(@Param('id') id: string) {

@@ -28,9 +28,9 @@ async function bootstrap() {
     console.log('✅ Compañía creada');
   }
 
-  // 2. Crear Administrador
+  // 2. Crear o Actualizar Administrador
   const userRepo = dataSource.getRepository(User);
-  const password = await bcrypt.hash('admin123', 10);
+  const password = await bcrypt.hash('admin123456', 10);
 
   let admin = await userRepo.findOne({ where: { email: 'admin@ambugo.com' } });
   if (!admin) {
@@ -41,11 +41,14 @@ async function bootstrap() {
       role: UserRole.ADMIN,
       isActive: true,
     });
-    await userRepo.save(admin);
     console.log('✅ Administrador creado: admin@ambugo.com');
+  } else {
+    admin.password = password;
+    console.log('🔄 Contraseña de Administrador actualizada');
   }
+  await userRepo.save(admin);
 
-  // 3. Crear Conductores
+  // 3. Crear o Actualizar Conductores
   const conductorsData = [
     { name: 'Juan Perez', email: 'juan@ambugo.com' },
     { name: 'Maria Lopez', email: 'maria@ambugo.com' },
@@ -61,9 +64,12 @@ async function bootstrap() {
         role: UserRole.CONDUCTOR,
         isActive: true,
       });
-      user = await userRepo.save(user);
       console.log(`✅ Conductor creado: ${data.name}`);
+    } else {
+      user.password = password;
+      console.log(`🔄 Contraseña de Conductor actualizada: ${data.name}`);
     }
+    user = await userRepo.save(user);
     conductors.push(user);
   }
 

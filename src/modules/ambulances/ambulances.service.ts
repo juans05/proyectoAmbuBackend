@@ -67,6 +67,42 @@ export class AmbulancesService {
     );
   }
 
+  async findByConductor(conductorId: string): Promise<Ambulance | null> {
+    return this.ambulanceRepo.findOne({
+      where: { conductorId, isActive: true },
+      relations: ['company'],
+    });
+  }
+
+  async updateStatusByConductor(
+    conductorId: string,
+    status: AmbulanceStatus,
+  ): Promise<void> {
+    await this.ambulanceRepo.update({ conductorId }, { status });
+  }
+
+  async getConductorDayStats(
+    conductorId: string,
+  ): Promise<{ services: number; totalAmount: number }> {
+    const result = await this.dataSource.query(
+      `
+      SELECT
+        COUNT(*) AS services,
+        COALESCE(SUM(e."totalAmount"), 0) AS total_amount
+      FROM emergencies e
+      JOIN ambulances a ON e."ambulanceId" = a.id
+      WHERE a."conductorId" = $1
+        AND e.status = 'completed'
+        AND DATE(e."completedAt") = CURRENT_DATE
+      `,
+      [conductorId],
+    );
+    return {
+      services: +result[0]?.services || 0,
+      totalAmount: +result[0]?.total_amount || 0,
+    };
+  }
+
   async findNearby(query: GeoQueryDto): Promise<Ambulance[]> {
     const radiusMeters = kmToMeters(query.radius ?? 5);
     return this.dataSource.query(

@@ -2,13 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Emergency } from '../emergencies/entities/emergency.entity';
+import { Ambulance } from '../ambulances/entities/ambulance.entity';
 import { EmergencyStatus } from '../../common/enums/emergency-status.enum';
+import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
 
 @Injectable()
 export class ReportsService {
   constructor(
     @InjectRepository(Emergency)
     private readonly emergencyRepo: Repository<Emergency>,
+    @InjectRepository(Ambulance)
+    private readonly ambulanceRepo: Repository<Ambulance>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -20,9 +24,9 @@ export class ReportsService {
       avgResponseTime,
     ] = await Promise.all([
       this.emergencyRepo.count({ where: { status: EmergencyStatus.ASSIGNED } }),
-      this.dataSource.query<Array<{ count: string }>>(
-        `SELECT COUNT(*) FROM ambulances WHERE status = 'available' AND "isActive" = true`,
-      ),
+      this.ambulanceRepo.count({
+        where: { status: AmbulanceStatus.AVAILABLE, isActive: true },
+      }),
       this.dataSource.query<Array<{ total: string }>>(`
           SELECT COALESCE(SUM(amount), 0) as total
           FROM payments
@@ -37,7 +41,7 @@ export class ReportsService {
 
     return {
       activeEmergencies,
-      availableAmbulances: +(availableAmbulances[0]?.count ?? 0),
+      availableAmbulances,
       todayRevenue: +(todayRevenue[0]?.total ?? 0),
       avgResponseMinutes: +parseFloat(
         avgResponseTime[0]?.avg_minutes ?? '0',

@@ -132,6 +132,8 @@ export class AmbulancesService {
       `
       SELECT
         a.*,
+        a."locationLat" as "locationLat",
+        a."locationLng" as "locationLng",
         ST_Distance(
           a.location::geography,
           ST_MakePoint($1, $2)::geography

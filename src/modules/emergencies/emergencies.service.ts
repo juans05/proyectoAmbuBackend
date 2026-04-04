@@ -5,14 +5,18 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, In, MoreThan } from 'typeorm';
 import { Emergency } from './entities/emergency.entity';
 import { EmergencyStatus } from '../../common/enums/emergency-status.enum';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { CreateEmergencyDto } from './dto/create-emergency.dto';
 import { CompleteEmergencyDto } from './dto/complete-emergency.dto';
-
 import { RouteAnalyticsService } from '../tracking/route-analytics.service';
+import { PaginationDto } from '../../common/dto/pagination.dto';
+import {
+  paginate,
+  paginationToSkipTake,
+} from '../../common/utils/pagination.utils';
 
 @Injectable()
 export class EmergenciesService {
@@ -102,11 +106,30 @@ export class EmergenciesService {
     });
   }
 
-  async findAll() {
-    return this.emergencyRepo.find({
+  async findAll(pagination: PaginationDto, status?: string) {
+    const { skip, take } = paginationToSkipTake(
+      pagination.page!,
+      pagination.limit!,
+    );
+
+    const where: any = {};
+    if (status) {
+      if (status.includes(',')) {
+        where.status = In(status.split(','));
+      } else {
+        where.status = status;
+      }
+    }
+
+    const [data, total] = await this.emergencyRepo.findAndCount({
+      where,
+      relations: ['user', 'ambulance', 'ambulance.conductor'],
       order: { createdAt: 'DESC' },
-      relations: ['user', 'ambulance'],
+      skip,
+      take,
     });
+
+    return paginate(data, total, pagination.page!, pagination.limit!);
   }
 
   async cancel(id: string, userId: string) {

@@ -6,6 +6,7 @@ import {
   Get,
   Param,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -18,6 +19,7 @@ import { User } from '../users/entities/user.entity';
 import { EmergenciesService } from './emergencies.service';
 import { CreateEmergencyDto } from './dto/create-emergency.dto';
 import { CompleteEmergencyDto } from './dto/complete-emergency.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('Emergencies')
 @ApiBearerAuth()
@@ -48,8 +50,8 @@ export class EmergenciesController {
   @Get()
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: '[ADMIN] Listar todas las emergencias' })
-  async findAll() {
-    return this.emergenciesService.findAll();
+  async findAll(@Query() pagination: PaginationDto, @Query('status') status?: string) {
+    return this.emergenciesService.findAll(pagination, status);
   }
 
   @Get(':id')

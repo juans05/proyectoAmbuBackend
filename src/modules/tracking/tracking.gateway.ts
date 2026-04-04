@@ -1,43 +1,245 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards, Logger } from '@nestjs/common';
-import { WsJwtGuard } from '../auth/guards/ws-jwt.guard'; // I'll need to create this for WS
+import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import Redis from 'ioredis';
+import { Ambulance } from '../ambulances/entities/ambulance.entity';
+import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
 import { SocketEvents } from '../../common/constants/socket-events.constant';
 
 @WebSocketGateway({
   namespace: '/tracking',
   cors: { origin: '*' },
 })
-export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class TrackingGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(TrackingGateway.name);
 
-  handleConnection(client: Socket) {
-    this.logger.debug(`Client connected: ${client.id}`);
-  }
+  // Mapeo socketId → userId para gestionar desconexiones
+  private readonly socketToUser = new Map<string, string>();
+  // Mapeo userId → socketId para verificar reconexiones en grace period
+  private readonly userToSocket = new Map<string, string>();
+  // Timers de grace period por userId
+  private readonly disconnectTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
 
-  handleDisconnect(client: Socket) {
-    this.logger.debug(`Client disconnected: ${client.id}`);
-  }
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly redisClient: Redis,
+    @InjectRepository(Ambulance)
+    private readonly ambulanceRepo: Repository<Ambulance>,
+  ) {}
 
-  @SubscribeMessage(SocketEvents.UPDATE_LOCATION)
-  handleUpdateLocation(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
-    this.logger.debug(`Location update from ${client.id}: ${JSON.stringify(data)}`);
-    // Emitir a la sala de la emergencia si corresponde
-    if (data.emergencyId) {
-      this.server.to(`emergency_${data.emergencyId}`).emit(SocketEvents.AMBULANCE_LOCATION, data);
+  // ─── Conexión con JWT en handshake ──────────────────────────────────────────
+
+  async handleConnection(client: Socket) {
+    try {
+      // Extraer token del handshake: auth.token (Bearer xxx) o headers.authorization
+      const rawToken =
+        client.handshake.auth?.token || client.handshake.headers?.authorization;
+
+      const token = rawToken?.startsWith('Bearer ')
+        ? rawToken.slice(7)
+        : rawToken;
+
+      if (!token) {
+        this.logger.warn(`Conexión rechazada (sin token): ${client.id}`);
+        client.disconnect(true);
+        return;
+      }
+
+      const secret = this.configService.get<string>('jwt.accessSecret');
+      const payload = this.jwtService.verify(token, { secret });
+
+      if (!payload?.sub) {
+        client.disconnect(true);
+        return;
+      }
+
+      // Guardar userId en el socket para uso posterior
+      client.data.userId = payload.sub;
+      client.data.role = payload.role;
+
+      // Si el conductor reconectó antes de que expirara el grace period, cancelarlo
+      if (this.disconnectTimers.has(payload.sub)) {
+        clearTimeout(this.disconnectTimers.get(payload.sub));
+        this.disconnectTimers.delete(payload.sub);
+        this.logger.debug(
+          `Grace period cancelado — conductor ${payload.sub} reconectó`,
+        );
+      }
+
+      this.socketToUser.set(client.id, payload.sub);
+      this.userToSocket.set(payload.sub, client.id);
+
+      this.logger.debug(
+        `Cliente conectado: ${client.id} (userId: ${payload.sub})`,
+      );
+    } catch (err) {
+      this.logger.warn(`Conexión rechazada (token inválido): ${client.id}`);
+      client.disconnect(true);
     }
   }
 
-  @SubscribeMessage(SocketEvents.JOIN_EMERGENCY)
-  handleJoinEmergency(@MessageBody() data: { emergencyId: string }, @ConnectedSocket() client: Socket) {
-    client.join(`emergency_${data.emergencyId}`);
-    this.logger.debug(`Client ${client.id} joined emergency_${data.emergencyId}`);
+  // ─── Desconexión con grace period de 30s para conductores ───────────────────
+
+  handleDisconnect(client: Socket) {
+    const userId = this.socketToUser.get(client.id);
+    this.socketToUser.delete(client.id);
+
+    if (!userId) return;
+
+    this.logger.debug(`Cliente desconectado: ${client.id} (userId: ${userId})`);
+
+    // Grace period: esperar 30s antes de marcar offline (tolera reconexiones rápidas)
+    const timer = setTimeout(async () => {
+      this.disconnectTimers.delete(userId);
+
+      // Verificar si el usuario reconectó en otro socket
+      const currentSocketId = this.userToSocket.get(userId);
+      if (currentSocketId && currentSocketId !== client.id) {
+        this.logger.debug(
+          `Conductor ${userId} ya reconectó en socket ${currentSocketId}, no se marca offline`,
+        );
+        return;
+      }
+
+      this.userToSocket.delete(userId);
+
+      // Marcar ambulancia como offline en BD
+      try {
+        await this.ambulanceRepo.update(
+          { conductorId: userId },
+          { status: AmbulanceStatus.OFFLINE },
+        );
+        this.logger.log(
+          `Ambulancia del conductor ${userId} marcada OFFLINE tras grace period`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Error al marcar offline ambulancia del conductor ${userId}`,
+          err,
+        );
+      }
+    }, 30_000);
+
+    this.disconnectTimers.set(userId, timer);
   }
 
-  async emitToEmergency(emergencyId: string, event: string, data: any) {
+  // ─── Update location con throttle Redis (1 update/seg por conductor) ─────────
+
+  @SubscribeMessage(SocketEvents.UPDATE_LOCATION)
+  async handleUpdateLocation(
+    @MessageBody()
+    data: {
+      lat: number;
+      lng: number;
+      heading?: number;
+      speed?: number;
+      emergencyId?: string;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId: string = client.data?.userId;
+    if (!userId) return;
+
+    // Throttle: máx 1 update por segundo por conductor
+    const throttleKey = `throttle:location:${userId}`;
+    const exists = await this.redisClient.exists(throttleKey);
+    if (exists) {
+      // Silenciosamente ignorar — no enviar error al cliente para no saturar
+      return;
+    }
+    await this.redisClient.set(throttleKey, '1', 'PX', 1000);
+
+    // Persistir ubicación en BD (PostGIS: ST_MakePoint(lng, lat))
+    try {
+      await this.ambulanceRepo
+        .createQueryBuilder()
+        .update(Ambulance)
+        .set({
+          locationLat: data.lat,
+          locationLng: data.lng,
+          locationUpdatedAt: () => 'NOW()',
+          location: () => `ST_MakePoint(${data.lng}, ${data.lat})`,
+        })
+        .where('"conductorId" = :userId', { userId })
+        .execute();
+    } catch (err) {
+      this.logger.error(
+        `Error al persistir ubicación del conductor ${userId}`,
+        err,
+      );
+    }
+
+    // Emitir a la sala de la emergencia activa si corresponde
+    if (data.emergencyId) {
+      this.server
+        .to(`emergency_${data.emergencyId}`)
+        .emit(SocketEvents.AMBULANCE_LOCATION, {
+          lat: data.lat,
+          lng: data.lng,
+          heading: data.heading,
+          speed: data.speed,
+        });
+    }
+
+    this.logger.debug(
+      `Location update: userId=${userId} lat=${data.lat} lng=${data.lng}`,
+    );
+  }
+
+  // ─── Join emergency room ──────────────────────────────────────────────────────
+
+  @SubscribeMessage(SocketEvents.JOIN_EMERGENCY)
+  handleJoinEmergency(
+    @MessageBody() data: { emergencyId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`emergency_${data.emergencyId}`);
+    this.logger.debug(
+      `Cliente ${client.id} unido a emergency_${data.emergencyId}`,
+    );
+  }
+
+  // ─── Leave emergency room ─────────────────────────────────────────────────────
+
+  @SubscribeMessage(SocketEvents.LEAVE_EMERGENCY)
+  handleLeaveEmergency(
+    @MessageBody() data: { emergencyId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.leave(`emergency_${data.emergencyId}`);
+    this.logger.debug(
+      `Cliente ${client.id} salió de emergency_${data.emergencyId}`,
+    );
+  }
+
+  // ─── Método público para otros servicios (dispatch, etc.) ────────────────────
+
+  emitToEmergency(
+    emergencyId: string,
+    event: string,
+    data: Record<string, unknown>,
+  ) {
     this.server.to(`emergency_${emergencyId}`).emit(event, data);
   }
 }

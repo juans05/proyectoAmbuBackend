@@ -1,7 +1,9 @@
-import * as Joi from 'joi'
+import * as Joi from 'joi';
 
 export const envValidationSchema = Joi.object({
-  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'production', 'test')
+    .default('development'),
   PORT: Joi.number().default(3000),
 
   DB_HOST: Joi.string().required(),
@@ -39,9 +41,9 @@ export const envValidationSchema = Joi.object({
   PRICE_TYPE_I: Joi.number().default(100),
   PRICE_TYPE_II: Joi.number().default(150),
   PRICE_TYPE_III: Joi.number().default(350),
-  SUBSCRIPTION_DISCOUNT: Joi.number().default(0.20),
+  SUBSCRIPTION_DISCOUNT: Joi.number().default(0.2),
   PLATFORM_COMMISSION: Joi.number().default(0.12),
 
   MAX_DISPATCH_RADIUS_KM: Joi.number().default(5),
   DISPATCH_TIMEOUT_SECONDS: Joi.number().default(30),
-})
+});

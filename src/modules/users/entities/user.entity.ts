@@ -1,61 +1,67 @@
-import { Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm'
-import { UserRole } from '../../../common/enums/user-role.enum'
-import { FamilyMember } from './family-member.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { UserRole } from '../../../common/enums/user-role.enum';
+import { FamilyMember } from './family-member.entity';
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id: string
+  id: string;
 
   @Column({ length: 100 })
-  name: string
+  name: string;
 
   @Column({ unique: true, length: 150 })
-  email: string
+  email: string;
 
   @Column({ nullable: true, length: 20 })
-  phone: string
+  phone: string;
 
-  @Column({ nullable: true, select: false })  // select:false = no se devuelve por defecto
-  password: string
+  @Column({ nullable: true, select: false }) // select:false = no se devuelve por defecto
+  password: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
-  role: UserRole
+  role: UserRole;
 
   @Column({ default: 'free' })
-  subscriptionTier: string      // 'free' | 'protegido' | 'pro'
+  subscriptionTier: string; // 'free' | 'protegido' | 'pro'
 
   @OneToMany(() => FamilyMember, (familyMember) => familyMember.user)
-  familyMembers: FamilyMember[]
+  familyMembers: FamilyMember[];
 
   @Column({ default: false })
-  emailVerified: boolean
+  emailVerified: boolean;
 
   @Column({ nullable: true })
-  avatarUrl: string
+  avatarUrl: string;
 
   @Column({ nullable: true, length: 5 })
-  bloodType: string     // A+, A-, B+, B-, AB+, AB-, O+, O-
+  bloodType: string; // A+, A-, B+, B-, AB+, AB-, O+, O-
 
   @Column({ nullable: true, type: 'text' })
-  allergies: string
+  allergies: string;
 
   @Column({ nullable: true, type: 'text' })
-  chronicConditions: string
+  chronicConditions: string;
 
   @Column({ nullable: true })
-  fcmToken: string      // Firebase Cloud Messaging token para notificaciones push
+  fcmToken: string; // Firebase Cloud Messaging token para notificaciones push
 
   @Column({ nullable: true })
-  refreshToken: string  // hash del refresh token activo
+  refreshToken: string; // hash del refresh token activo
 
   @Column({ default: true })
-  isActive: boolean
+  isActive: boolean;
 
   @CreateDateColumn()
-  createdAt: Date
+  createdAt: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date
+  updatedAt: Date;
 }

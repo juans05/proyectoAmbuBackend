@@ -1,17 +1,17 @@
-import { IsString, IsOptional, IsIn } from 'class-validator'
+import { IsString, IsOptional, IsIn } from 'class-validator';
 
-const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export class UpdateMedicalDto {
   @IsOptional()
   @IsIn(BLOOD_TYPES, { message: 'Tipo de sangre inválido' })
-  bloodType?: string
+  bloodType?: string;
 
   @IsOptional()
   @IsString()
-  allergies?: string
+  allergies?: string;
 
   @IsOptional()
   @IsString()
-  chronicConditions?: string
+  chronicConditions?: string;
 }

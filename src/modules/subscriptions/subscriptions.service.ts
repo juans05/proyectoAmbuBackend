@@ -1,15 +1,18 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
-import { ConfigService } from '@nestjs/config'
-import { Subscription } from './entities/subscription.entity'
-import { CreateSubscriptionDto } from './dto/create-subscription.dto'
-import { UsersService } from '../users/users.service'
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Subscription } from './entities/subscription.entity';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { UsersService } from '../users/users.service';
 
 const PLAN_PRICES: Record<string, number> = {
-  protegido: 29.90,
-  familia: 49.90,
-}
+  protegido: 29.9,
+  familia: 49.9,
+};
 
 @Injectable()
 export class SubscriptionsService {
@@ -25,24 +28,37 @@ export class SubscriptionsService {
         id: 'protegido',
         name: 'Plan Protegido',
         price: PLAN_PRICES.protegido,
-        benefits: ['20% descuento en emergencias', 'Hasta 1 beneficiario', 'Soporte prioritario'],
+        benefits: [
+          '20% descuento en emergencias',
+          'Hasta 1 beneficiario',
+          'Soporte prioritario',
+        ],
       },
       {
         id: 'familia',
         name: 'Plan Familia',
         price: PLAN_PRICES.familia,
-        benefits: ['20% descuento en emergencias', 'Hasta 5 beneficiarios', 'Soporte 24/7'],
+        benefits: [
+          '20% descuento en emergencias',
+          'Hasta 5 beneficiarios',
+          'Soporte 24/7',
+        ],
       },
-    ]
+    ];
   }
 
-  async create(userId: string, dto: CreateSubscriptionDto): Promise<Subscription> {
-    const active = await this.subRepo.findOne({ where: { userId, status: 'active' } })
-    if (active) throw new ConflictException('Ya tienes una suscripción activa')
+  async create(
+    userId: string,
+    dto: CreateSubscriptionDto,
+  ): Promise<Subscription> {
+    const active = await this.subRepo.findOne({
+      where: { userId, status: 'active' },
+    });
+    if (active) throw new ConflictException('Ya tienes una suscripción activa');
 
-    const startDate = new Date()
-    const endDate = new Date(startDate)
-    endDate.setMonth(endDate.getMonth() + 1)
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
 
     const sub = this.subRepo.create({
       userId,
@@ -51,20 +67,23 @@ export class SubscriptionsService {
       startDate,
       endDate,
       status: 'active',
-    })
-    const saved = await this.subRepo.save(sub)
-    await this.usersService.update(userId, { subscriptionTier: dto.plan })
-    return saved
+    });
+    const saved = await this.subRepo.save(sub);
+    await this.usersService.update(userId, { subscriptionTier: dto.plan });
+    return saved;
   }
 
   async findActive(userId: string): Promise<Subscription | null> {
-    return this.subRepo.findOne({ where: { userId, status: 'active' } })
+    return this.subRepo.findOne({ where: { userId, status: 'active' } });
   }
 
   async cancel(userId: string): Promise<void> {
-    const sub = await this.findActive(userId)
-    if (!sub) throw new NotFoundException('No tienes suscripción activa')
-    await this.subRepo.update(sub.id, { status: 'cancelled', cancelledAt: new Date() })
-    await this.usersService.update(userId, { subscriptionTier: 'free' })
+    const sub = await this.findActive(userId);
+    if (!sub) throw new NotFoundException('No tienes suscripción activa');
+    await this.subRepo.update(sub.id, {
+      status: 'cancelled',
+      cancelledAt: new Date(),
+    });
+    await this.usersService.update(userId, { subscriptionTier: 'free' });
   }
 }

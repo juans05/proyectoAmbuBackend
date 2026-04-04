@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -25,6 +26,9 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Global response wrapper: { data, statusCode, timestamp }
+  app.useGlobalInterceptors(new TransformInterceptor());
 
   // Swagger Documentation
   const config = new DocumentBuilder()

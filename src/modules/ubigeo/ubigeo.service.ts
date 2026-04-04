@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository, Like } from 'typeorm'
-import { District } from './entities/district.entity'
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Like } from 'typeorm';
+import { District } from './entities/district.entity';
 
 @Injectable()
 export class UbigeoService {
@@ -19,11 +19,11 @@ export class UbigeoService {
         ],
         order: { district: 'ASC' },
         take: 50,
-      })
+      });
     }
     return this.districtRepo.find({
       where: [{ province: 'LIMA' }, { province: 'CALLAO' }],
       order: { district: 'ASC' },
-    })
+    });
   }
 }

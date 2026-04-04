@@ -12,7 +12,7 @@ import * as bcrypt from 'bcryptjs';
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const dataSource = app.get(DataSource);
-  
+
   console.log('🌱 Iniciando Seeding...');
 
   // 1. Crear Compañía
@@ -28,10 +28,24 @@ async function bootstrap() {
     console.log('✅ Compañía creada');
   }
 
-  // 2. Crear Conductores
+  // 2. Crear Administrador
   const userRepo = dataSource.getRepository(User);
   const password = await bcrypt.hash('admin123', 10);
 
+  let admin = await userRepo.findOne({ where: { email: 'admin@ambugo.com' } });
+  if (!admin) {
+    admin = userRepo.create({
+      name: 'Administrador Central',
+      email: 'admin@ambugo.com',
+      password,
+      role: UserRole.ADMIN,
+      isActive: true,
+    });
+    await userRepo.save(admin);
+    console.log('✅ Administrador creado: admin@ambugo.com');
+  }
+
+  // 3. Crear Conductores
   const conductorsData = [
     { name: 'Juan Perez', email: 'juan@ambugo.com' },
     { name: 'Maria Lopez', email: 'maria@ambugo.com' },
@@ -56,8 +70,13 @@ async function bootstrap() {
   // 3. Crear Ambulancias (Ubicación: Cercado de Lima)
   const ambulanceRepo = dataSource.getRepository(Ambulance);
   const coordinates = [
-    { lat: -12.046374, lng: -77.042793, plate: 'ABC-123', type: AmbulanceType.I },
-    { lat: -12.050000, lng: -77.045000, plate: 'XYZ-987', type: AmbulanceType.II },
+    {
+      lat: -12.046374,
+      lng: -77.042793,
+      plate: 'ABC-123',
+      type: AmbulanceType.I,
+    },
+    { lat: -12.05, lng: -77.045, plate: 'XYZ-987', type: AmbulanceType.II },
   ];
 
   for (let i = 0; i < coordinates.length; i++) {

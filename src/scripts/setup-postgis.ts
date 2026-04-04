@@ -16,18 +16,19 @@ async function setupPostGIS() {
   try {
     console.log(`📡 Conectando a ${process.env.DB_HOST}...`);
     await client.connect();
-    
+
     console.log('🚀 Intentando instalar extensión PostGIS...');
     await client.query('CREATE EXTENSION IF NOT EXISTS postgis;');
-    
+
     const res = await client.query('SELECT postgis_full_version();');
     console.log('✅ PostGIS instalado correctamente!');
     console.log('📦 Versión:', res.rows[0].postgis_full_version);
-    
   } catch (err) {
     console.error('❌ Error instalando PostGIS:', err.message);
     if (err.message.includes('permission denied')) {
-      console.error('👉 Tip: Asegúrate de que el usuario tiene permisos de Superusuario.');
+      console.error(
+        '👉 Tip: Asegúrate de que el usuario tiene permisos de Superusuario.',
+      );
     }
   } finally {
     await client.end();

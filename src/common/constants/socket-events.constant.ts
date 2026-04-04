@@ -8,6 +8,6 @@ export const SocketEvents = {
   EMERGENCY_ASSIGNED: 'emergency_assigned',
   AMBULANCE_LOCATION: 'ambulance_location',
   STATUS_CHANGE: 'status_change',
-  NO_AMBULANCE: 'no_ambulance',
+  NO_AMBULANCE: 'no_ambulance_available',
   NEW_EMERGENCY: 'new_emergency',
 };

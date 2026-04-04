@@ -1,32 +1,38 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm'
-import { User } from '../../users/entities/user.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+} from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
-  id: string
+  id: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  user: User
+  user: User;
 
   @Column()
-  userId: string
+  userId: string;
 
   @Column({ length: 150 })
-  title: string
+  title: string;
 
   @Column({ type: 'text' })
-  body: string
+  body: string;
 
   @Column({ length: 50 })
-  type: string  // NEW_EMERGENCY | EMERGENCY_ASSIGNED | EMERGENCY_COMPLETED | SYSTEM
+  type: string; // NEW_EMERGENCY | EMERGENCY_ASSIGNED | EMERGENCY_COMPLETED | SYSTEM
 
   @Column({ type: 'jsonb', nullable: true })
-  data: Record<string, any>
+  data: Record<string, any>;
 
   @Column({ default: false })
-  isRead: boolean
+  isRead: boolean;
 
   @CreateDateColumn()
-  createdAt: Date
+  createdAt: Date;
 }

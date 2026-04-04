@@ -13,7 +13,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('jwt.accessSecret') || 'ambugo_access_secret_placeholder',
+      secretOrKey:
+        configService.get<string>('jwt.accessSecret') ||
+        'ambugo_access_secret_placeholder',
     });
   }
 

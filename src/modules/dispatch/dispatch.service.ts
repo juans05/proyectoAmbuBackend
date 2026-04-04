@@ -7,7 +7,9 @@ import { DISPATCH_QUEUE } from '../../common/constants/queues.constant';
 export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
 
-  constructor(@InjectQueue(DISPATCH_QUEUE) private readonly dispatchQueue: Queue) {}
+  constructor(
+    @InjectQueue(DISPATCH_QUEUE) private readonly dispatchQueue: Queue,
+  ) {}
 
   async dispatchEmergency(emergencyId: string) {
     this.logger.debug(`Enqueuing emergency dispatch for ID: ${emergencyId}`);

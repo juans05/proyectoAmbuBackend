@@ -1,42 +1,49 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne,
-  CreateDateColumn, UpdateDateColumn, Index } from 'typeorm'
-import { EmergencyStatus } from '../../../common/enums/emergency-status.enum'
-import { User } from '../../users/entities/user.entity'
-import { Ambulance } from '../../ambulances/entities/ambulance.entity'
-import { FamilyMember } from '../../users/entities/family-member.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
+import { EmergencyStatus } from '../../../common/enums/emergency-status.enum';
+import { User } from '../../users/entities/user.entity';
+import { Ambulance } from '../../ambulances/entities/ambulance.entity';
+import { FamilyMember } from '../../users/entities/family-member.entity';
 
 @Entity('emergencies')
 export class Emergency {
   @PrimaryGeneratedColumn('uuid')
-  id: string
+  id: string;
 
   @ManyToOne(() => User)
-  user: User
+  user: User;
 
   @Column()
-  userId: string
+  userId: string;
 
   @ManyToOne(() => Ambulance, { nullable: true })
-  ambulance: Ambulance
+  ambulance: Ambulance;
 
   @Column({ nullable: true })
-  ambulanceId: string
+  ambulanceId: string;
 
   @ManyToOne(() => FamilyMember, { nullable: true })
-  familyMember: FamilyMember
+  familyMember: FamilyMember;
 
   @Column({ nullable: true })
-  familyMemberId: string
+  familyMemberId: string;
 
   @Column({
     type: 'enum',
     enum: EmergencyStatus,
     default: EmergencyStatus.PENDING,
   })
-  status: EmergencyStatus
+  status: EmergencyStatus;
 
   @Column({ length: 20, default: 'critical' })
-  type: string   // critical | urgent | transfer
+  type: string; // critical | urgent | transfer
 
   // Ubicación del usuario — PostGIS
   @Index({ spatial: true })
@@ -45,56 +52,56 @@ export class Emergency {
     spatialFeatureType: 'Point',
     srid: 4326,
   })
-  userLocation: any   // Formato GeoJSON: { type: 'Point', coordinates: [lng, lat] }
+  userLocation: any; // Formato GeoJSON: { type: 'Point', coordinates: [lng, lat] }
 
   @Column({ type: 'float' })
-  userLat: number
+  userLat: number;
 
   @Column({ type: 'float' })
-  userLng: number
+  userLng: number;
 
   @Column({ type: 'text' })
-  address: string
+  address: string;
 
   @Column({ nullable: true, type: 'text' })
-  notes: string
+  notes: string;
 
   @Column({ type: 'float', nullable: true })
-  totalAmount: number
+  totalAmount: number;
 
   @Column({ default: false })
-  discountApplied: boolean  // si el usuario tenía suscripción activa
+  discountApplied: boolean; // si el usuario tenía suscripción activa
 
   @Column({ type: 'float', nullable: true })
-  platformFee: number       // 12% del total
+  platformFee: number; // 12% del total
 
   @Column({ type: 'float', nullable: true })
-  companyAmount: number     // 88% del total
+  companyAmount: number; // 88% del total
 
   @Column({ nullable: true })
-  estimatedArrivalMinutes: number
+  estimatedArrivalMinutes: number;
 
   @Column({ nullable: true })
-  assignedAt: Date
+  assignedAt: Date;
 
   @Column({ nullable: true })
-  arrivedAt: Date
+  arrivedAt: Date;
 
   @Column({ nullable: true })
-  completedAt: Date
+  completedAt: Date;
 
   @Column({ nullable: true })
-  cancelledAt: Date
+  cancelledAt: Date;
 
   @Column({ nullable: true, type: 'text' })
-  cancelReason: string
+  cancelReason: string;
 
   @Column({ nullable: true, type: 'int' })
-  userRating: number    // 1-5
+  userRating: number; // 1-5
 
   @CreateDateColumn()
-  createdAt: Date
+  createdAt: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date
+  updatedAt: Date;
 }

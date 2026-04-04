@@ -1,44 +1,50 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm'
-import { User } from '../../users/entities/user.entity'
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+} from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('payments')
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
-  id: string
+  id: string;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
-  user: User
+  user: User;
 
   @Column({ nullable: true })
-  userId: string
+  userId: string;
 
   @Column({ nullable: true })
-  emergencyId: string
+  emergencyId: string;
 
   @Column({ nullable: true })
-  subscriptionId: string
+  subscriptionId: string;
 
   @Column({ length: 20 })
-  type: string  // 'emergency' | 'subscription'
+  type: string; // 'emergency' | 'subscription'
 
   @Column({ type: 'float' })
-  amount: number
+  amount: number;
 
   @Column({ type: 'float', nullable: true })
-  platformFee: number  // 12%
+  platformFee: number; // 12%
 
   @Column({ type: 'float', nullable: true })
-  companyAmount: number  // 88%
+  companyAmount: number; // 88%
 
   @Column({ length: 20, default: 'pending' })
-  status: string  // 'pending' | 'paid' | 'failed' | 'refunded'
+  status: string; // 'pending' | 'paid' | 'failed' | 'refunded'
 
   @Column({ nullable: true })
-  culqiChargeId: string
+  culqiChargeId: string;
 
   @Column({ length: 20, nullable: true })
-  paymentMethod: string  // 'card' | 'cash'
+  paymentMethod: string; // 'card' | 'cash'
 
   @CreateDateColumn()
-  createdAt: Date
+  createdAt: Date;
 }

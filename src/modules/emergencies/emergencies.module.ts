@@ -6,10 +6,7 @@ import { EmergenciesController } from './emergencies.controller';
 import { DispatchModule } from '../dispatch/dispatch.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Emergency]),
-    DispatchModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Emergency]), DispatchModule],
   providers: [EmergenciesService],
   controllers: [EmergenciesController],
   exports: [EmergenciesService],

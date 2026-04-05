@@ -312,4 +312,17 @@ export class TrackingGateway
   ) {
     this.server.to(`emergency_${emergencyId}`).emit(event, data);
   }
+
+  /**
+   * Envía un evento a un usuario específico (ej: conductor asignado)
+   */
+  emitToUser(userId: string, event: string, data: Record<string, unknown>) {
+    const socketId = this.userToSocket.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit(event, data);
+      this.logger.debug(`Evento ${event} enviado al usuario ${userId} (${socketId})`);
+    } else {
+      this.logger.warn(`No se pudo enviar ${event} al usuario ${userId}: Socket no encontrado`);
+    }
+  }
 }

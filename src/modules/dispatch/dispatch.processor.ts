@@ -170,7 +170,19 @@ export class DispatchProcessor {
       });
     }
 
-    // 6. Notificar al usuario via WebSocket
+    // 6. Notificar al conductor via WebSocket (INSTANTÁNEO si la app está abierta)
+    this.trackingGateway.emitToUser(ambulance.conductorId, 'new_emergency', {
+      emergencyId,
+      polyline,
+      userLat: emergency.userLat,
+      userLng: emergency.userLng,
+      userName: emergency.user.name,
+      bloodType: emergency.user.bloodType || '—',
+      allergies: emergency.user.allergies || 'Ninguna',
+      address: emergency.address,
+    });
+
+    // 7. Notificar al usuario via WebSocket
     this.trackingGateway.emitToEmergency(emergencyId, 'emergency_assigned', {
       ambulanceId: ambulance.id,
       conductorName: ambulance.conductor_name,

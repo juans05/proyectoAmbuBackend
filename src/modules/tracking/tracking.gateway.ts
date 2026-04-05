@@ -63,7 +63,7 @@ export class TrackingGateway
 
   // ─── Conexión con JWT en handshake ──────────────────────────────────────────
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     try {
       const auth = client.handshake.auth as Record<string, string | undefined>;
       const headers = client.handshake.headers as Record<
@@ -103,11 +103,10 @@ export class TrackingGateway
 
       // Si es conductor, precargar su ambulanceId para ahorrar queries luego
       if (payload.role === 'conductor') {
-        void this.ambulanceRepo
-          .findOne({ where: { conductorId: payload.sub } })
-          .then((amb) => {
-            if (amb) data.ambulanceId = amb.id;
-          });
+        const amb = await this.ambulanceRepo.findOne({
+          where: { conductorId: payload.sub },
+        });
+        if (amb) data.ambulanceId = amb.id;
       }
 
       client.data = data;
@@ -249,11 +248,14 @@ export class TrackingGateway
       );
     }
 
+    const ambulanceId = (client.data as SocketData)?.ambulanceId;
+
     // Emitir a la sala de la emergencia activa si corresponde
     if (data.emergencyId) {
       this.server
         .to(`emergency_${data.emergencyId}`)
         .emit(SocketEvents.AMBULANCE_LOCATION, {
+          ambulanceId,
           lat: data.lat,
           lng: data.lng,
           heading: data.heading,
@@ -261,8 +263,17 @@ export class TrackingGateway
         });
     }
 
+    // EMISION GLOBAL (Dashboard): Para que el mapa administrativo vea el movimiento en tiempo real
+    this.server.emit(SocketEvents.AMBULANCE_LOCATION, {
+      ambulanceId,
+      lat: data.lat,
+      lng: data.lng,
+      heading: data.heading,
+      speed: data.speed,
+    });
+
     this.logger.debug(
-      `Location update: userId=${userId} lat=${data.lat} lng=${data.lng}`,
+      `Location update: userId=${userId} ambId=${ambulanceId} lat=${data.lat} lng=${data.lng}`,
     );
   }
 

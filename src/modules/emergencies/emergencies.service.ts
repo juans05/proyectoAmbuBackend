@@ -112,22 +112,26 @@ export class EmergenciesService {
       pagination.limit!,
     );
 
-    const where: any = {};
+    const query = this.emergencyRepo
+      .createQueryBuilder('emergency')
+      .leftJoinAndSelect('emergency.user', 'user')
+      .leftJoinAndSelect('emergency.ambulance', 'ambulance')
+      .leftJoinAndSelect('ambulance.conductor', 'conductor')
+      .orderBy('emergency.createdAt', 'DESC')
+      .skip(skip)
+      .take(take);
+
     if (status) {
       if (status.includes(',')) {
-        where.status = In(status.split(','));
+        query.andWhere('emergency.status IN (:...statuses)', {
+          statuses: status.split(','),
+        });
       } else {
-        where.status = status;
+        query.andWhere('emergency.status = :status', { status });
       }
     }
 
-    const [data, total] = await this.emergencyRepo.findAndCount({
-      where,
-      relations: ['user', 'ambulance', 'ambulance.conductor'],
-      order: { createdAt: 'DESC' },
-      skip,
-      take,
-    });
+    const [data, total] = await query.getManyAndCount();
 
     return paginate(data, total, pagination.page!, pagination.limit!);
   }

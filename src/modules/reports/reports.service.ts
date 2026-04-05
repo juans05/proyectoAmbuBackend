@@ -29,13 +29,13 @@ export class ReportsService {
       }),
       this.dataSource.query<Array<{ total: string }>>(`
           SELECT COALESCE(SUM(amount), 0) as total
-          FROM payments
+          FROM ambudb.payments
           WHERE status = 'paid' AND DATE("createdAt") = CURRENT_DATE
         `),
       this.dataSource.query<Array<{ avg_minutes: string }>>(`
-          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("assignedAt" - "createdAt"))/60), 0) as avg_minutes
-          FROM emergencies
-          WHERE "assignedAt" IS NOT NULL AND DATE("createdAt") = CURRENT_DATE
+          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM ("assignedAt" - e."createdAt"))/60), 0) as avg_minutes
+          FROM ambudb.emergencies e
+          WHERE "assignedAt" IS NOT NULL AND DATE(e."createdAt") = CURRENT_DATE
         `),
     ]);
 
@@ -52,12 +52,12 @@ export class ReportsService {
   async responseTimes(): Promise<unknown[]> {
     return this.dataSource.query<unknown[]>(`
       SELECT
-        DATE_TRUNC('day', "createdAt") as day,
-        AVG(EXTRACT(EPOCH FROM ("assignedAt" - "createdAt"))/60) as avg_minutes,
+        DATE_TRUNC('day', e."createdAt") as day,
+        AVG(EXTRACT(EPOCH FROM ("assignedAt" - e."createdAt"))/60) as avg_minutes,
         COUNT(*) as total
-      FROM emergencies
+      FROM ambudb.emergencies e
       WHERE "assignedAt" IS NOT NULL
-        AND "createdAt" >= NOW() - INTERVAL '30 days'
+        AND e."createdAt" >= NOW() - INTERVAL '30 days'
       GROUP BY 1
       ORDER BY 1 DESC
     `);
@@ -70,13 +70,13 @@ export class ReportsService {
     return this.dataSource.query<unknown[]>(
       `
       SELECT
-        DATE_TRUNC('day', "createdAt") as day,
+        DATE_TRUNC('day', p."createdAt") as day,
         SUM(amount) as revenue,
         SUM("platformFee") as commissions,
         COUNT(*) as transactions
-      FROM payments
+      FROM ambudb.payments p
       WHERE status = 'paid'
-        AND "createdAt" BETWEEN $1 AND $2
+        AND p."createdAt" BETWEEN $1 AND $2
       GROUP BY 1
       ORDER BY 1 DESC
     `,
@@ -90,7 +90,7 @@ export class ReportsService {
         "userLat" as lat,
         "userLng" as lng,
         COUNT(*) as count
-      FROM emergencies
+      FROM ambudb.emergencies
       WHERE "createdAt" >= NOW() - INTERVAL '90 days'
       GROUP BY 1, 2
     `);

@@ -23,11 +23,24 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, pass: string): Promise<User | null> {
+    this.logger.debug(`Intentando validar usuario: ${email}`);
     const user = await this.usersService.findByEmailWithPassword(email);
-    if (user && (await bcrypt.compare(pass, user.password))) {
+    
+    if (!user) {
+      this.logger.warn(`Usuario no encontrado en la base de datos: ${email}`);
+      return null;
+    }
+
+    this.logger.debug(`Usuario encontrado: ${user.id}. Comparando contraseñas...`);
+    const isMatch = await bcrypt.compare(pass, user.password);
+    
+    if (isMatch) {
+      this.logger.log(`Autenticación exitosa para: ${email}`);
       const { password: _pw, ...result } = user;
       return result as User;
     }
+
+    this.logger.warn(`Contraseña incorrecta para el usuario: ${email}`);
     return null;
   }
 

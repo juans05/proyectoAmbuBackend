@@ -248,7 +248,20 @@ export class TrackingGateway
       );
     }
 
-    const ambulanceId = (client.data as SocketData)?.ambulanceId;
+    // OBTENER ID DE AMBULANCIA (Caché -> DB)
+    let ambulanceId = (client.data as SocketData)?.ambulanceId;
+    if (!ambulanceId) {
+      const amb = await this.ambulanceRepo.findOne({ where: { conductorId: userId } });
+      if (amb) {
+        ambulanceId = amb.id;
+        (client.data as SocketData).ambulanceId = amb.id; // Guardar para próxima vez
+      }
+    }
+
+    if (!ambulanceId) {
+      this.logger.warn(`No se pudo emitir ubicación: No se encontró ambulancia para el conductor ${userId}`);
+      return;
+    }
 
     // Emitir a la sala de la emergencia activa si corresponde
     if (data.emergencyId) {
@@ -270,10 +283,11 @@ export class TrackingGateway
       lng: data.lng,
       heading: data.heading,
       speed: data.speed,
+      status: AmbulanceStatus.AVAILABLE, // Forzar visualización como disponible si está en movimiento
     });
 
     this.logger.log(
-      `[GPS WS] Update: userId=${userId} ambId=${ambulanceId} lat=${data.lat} lng=${data.lng}`,
+      `[GPS MOVED] userId=${userId} ambId=${ambulanceId} -> Lat ${data.lat}, Lng ${data.lng}`,
     );
   }
 

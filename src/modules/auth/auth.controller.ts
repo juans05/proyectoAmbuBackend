@@ -45,7 +45,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly httpService: HttpService,
-  ) {}
+  ) { }
 
   @Public()
   @Post('register')
@@ -60,6 +60,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Iniciar sesión' })
   async login(@Body() dto: LoginDto) {
     const user = await this.authService.validateUser(dto.email, dto.password);
+    console.log(user);
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
     return this.authService.login(user);
   }

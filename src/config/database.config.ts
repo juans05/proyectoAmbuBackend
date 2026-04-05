@@ -1,9 +1,10 @@
+import 'dotenv/config';
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-const common = {
-  type: 'postgres',
+const getCommonConfig = () => ({
+  type: 'postgres' as const,
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '5432', 10),
   username: process.env.DB_USERNAME,
@@ -13,22 +14,21 @@ const common = {
   logging: process.env.NODE_ENV === 'development',
   synchronize: false,
   migrationsTableName: 'typeorm_migrations',
-} as const;
+});
 
-// Config used by Nest/TypeOrmModule (runtime built app uses compiled `dist` paths)
+// Config used by Nest/TypeOrmModule
 export default registerAs(
   'database',
   (): TypeOrmModuleOptions => ({
-    ...common,
+    ...getCommonConfig(),
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     migrations: ['dist/migrations/*.js'],
   }),
 );
 
-// Export a DataSource instance for the typeorm CLI (ts-node/run-time)
+// Export a DataSource instance for the typeorm CLI
 export const AppDataSource = new DataSource({
-  ...common,
+  ...getCommonConfig(),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  // CLI runs in TS (ts-node), point to source migrations
   migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
 });

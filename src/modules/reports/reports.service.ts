@@ -43,7 +43,7 @@ export class ReportsService {
       activeEmergencies,
       availableAmbulances,
       todayRevenue: +(todayRevenue[0]?.total ?? 0),
-      avgResponseMinutes: +parseFloat(
+      avgResponseTimeMinutes: +parseFloat(
         avgResponseTime[0]?.avg_minutes ?? '0',
       ).toFixed(1),
     };

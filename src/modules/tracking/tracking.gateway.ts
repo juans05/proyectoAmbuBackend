@@ -35,8 +35,7 @@ import { RouteLog } from './entities/route-log.entity';
   cors: { origin: '*' },
 })
 export class TrackingGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -60,13 +59,12 @@ export class TrackingGateway
     private readonly ambulanceRepo: Repository<Ambulance>,
     @InjectRepository(RouteLog)
     private readonly routeLogRepo: Repository<RouteLog>,
-  ) {}
+  ) { }
 
   // ─── Conexión con JWT en handshake ──────────────────────────────────────────
 
   handleConnection(client: Socket): void {
     try {
-      // Extraer token del handshake: auth.token (Bearer xxx) o headers.authorization
       const auth = client.handshake.auth as Record<string, string | undefined>;
       const headers = client.handshake.headers as Record<
         string,
@@ -79,11 +77,18 @@ export class TrackingGateway
         ? rawToken.slice(7)
         : rawToken;
 
-      if (!token) {
-        this.logger.warn(`Conexión rechazada (sin token): ${client.id}`);
+      if (!token || token === 'undefined') {
+        this.logger.warn(`Conexión rechazada (token ausente o "undefined"): client=${client.id} token=${token}`);
         client.disconnect(true);
         return;
       }
+
+      this.logger.debug(
+        `Token recibido para validación: len=${token.length}, start=${token.substring(
+          0,
+          10,
+        )}..., end=...${token.substring(token.length - 10)}`,
+      );
 
       const secret = this.configService.get<string>('jwt.accessSecret');
       const payload = this.jwtService.verify<JwtPayload>(token, { secret });
@@ -122,8 +127,11 @@ export class TrackingGateway
       this.logger.debug(
         `Cliente conectado: ${client.id} (userId: ${payload.sub})`,
       );
-    } catch {
-      this.logger.warn(`Conexión rechazada (token inválido): ${client.id}`);
+    } catch (error: any) {
+      this.logger.warn(
+        `Conexión rechazada (token inválido): ${client.id} - Razón: ${error.message || 'Desconocida'
+        }`,
+      );
       client.disconnect(true);
     }
   }

@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -15,6 +17,7 @@ import {
   paginate,
   paginationToSkipTake,
 } from '../../common/utils/pagination.utils';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class AmbulancesService {
@@ -22,6 +25,8 @@ export class AmbulancesService {
     @InjectRepository(Ambulance)
     private readonly ambulanceRepo: Repository<Ambulance>,
     private readonly dataSource: DataSource,
+    @Inject(forwardRef(() => TrackingGateway))
+    private readonly trackingGateway: TrackingGateway,
   ) {}
 
   async create(dto: CreateAmbulanceDto): Promise<Ambulance> {
@@ -100,6 +105,14 @@ export class AmbulancesService {
     status: AmbulanceStatus,
   ): Promise<void> {
     await this.ambulanceRepo.update({ conductorId }, { status });
+    // Notificar al dashboard en tiempo real
+    const amb = await this.ambulanceRepo.findOne({ where: { conductorId } });
+    if (amb) {
+      this.trackingGateway.emitToAll('status_change', {
+        ambulanceId: amb.id,
+        status,
+      });
+    }
   }
 
   async getConductorDayStats(

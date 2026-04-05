@@ -319,6 +319,10 @@ export class TrackingGateway
 
   // ─── Método público para otros servicios (dispatch, etc.) ────────────────────
 
+  emitToAll(event: string, data: Record<string, unknown>) {
+    this.server.emit(event, data);
+  }
+
   emitToEmergency(
     emergencyId: string,
     event: string,

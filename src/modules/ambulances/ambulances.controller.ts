@@ -21,12 +21,14 @@ import { AmbulancesService } from './ambulances.service';
 import { CreateAmbulanceDto } from './dto/create-ambulance.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { User } from '../users/entities/user.entity';
+import { Logger } from '@nestjs/common';
 
 @ApiTags('Ambulances')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('ambulances')
 export class AmbulancesController {
+  private readonly logger = new Logger(AmbulancesController.name);
   constructor(private readonly ambulancesService: AmbulancesService) {}
 
   @Post()
@@ -79,6 +81,7 @@ export class AmbulancesController {
     @CurrentUser() user: User,
     @Body('status') status: AmbulanceStatus,
   ) {
+    this.logger.log(`Conductor ${user.email} (ID: ${user.id}) cambiando estado a: ${status}`);
     return this.ambulancesService.updateStatusByConductor(user.id, status);
   }
 

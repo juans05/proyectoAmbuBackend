@@ -272,8 +272,8 @@ export class TrackingGateway
       speed: data.speed,
     });
 
-    this.logger.debug(
-      `Location update: userId=${userId} ambId=${ambulanceId} lat=${data.lat} lng=${data.lng}`,
+    this.logger.log(
+      `[GPS WS] Update: userId=${userId} ambId=${ambulanceId} lat=${data.lat} lng=${data.lng}`,
     );
   }
 

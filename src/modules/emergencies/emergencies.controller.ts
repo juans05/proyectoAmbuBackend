@@ -19,7 +19,7 @@ import { User } from '../users/entities/user.entity';
 import { EmergenciesService } from './emergencies.service';
 import { CreateEmergencyDto } from './dto/create-emergency.dto';
 import { CompleteEmergencyDto } from './dto/complete-emergency.dto';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { EmergencyQueryDto } from './dto/emergency-query.dto';
 
 @ApiTags('Emergencies')
 @ApiBearerAuth()
@@ -50,8 +50,8 @@ export class EmergenciesController {
   @Get()
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: '[ADMIN] Listar todas las emergencias' })
-  async findAll(@Query() pagination: PaginationDto, @Query('status') status?: string) {
-    return this.emergenciesService.findAll(pagination, status);
+  async findAll(@Query() query: EmergencyQueryDto) {
+    return this.emergenciesService.findAll(query, query.status);
   }
 
   @Get(':id')

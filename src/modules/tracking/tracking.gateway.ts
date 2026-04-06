@@ -65,6 +65,7 @@ export class TrackingGateway
 
   async handleConnection(client: Socket): Promise<void> {
     try {
+      console.log("******************************************");
       const auth = client.handshake.auth as Record<string, string | undefined>;
       const headers = client.handshake.headers as Record<
         string,
@@ -76,7 +77,7 @@ export class TrackingGateway
       const token: string | undefined = rawToken?.startsWith('Bearer ')
         ? rawToken.slice(7)
         : rawToken;
-
+      console.log(token);
       if (!token || token === 'undefined') {
         this.logger.warn(`Conexión rechazada (token ausente o "undefined"): client=${client.id} token=${token}`);
         client.disconnect(true);

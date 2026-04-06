@@ -24,4 +24,8 @@ export class CreateEmergencyDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsNumber()
+  @IsOptional()
+  altitude?: number;
 }

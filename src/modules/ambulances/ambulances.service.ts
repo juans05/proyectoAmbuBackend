@@ -86,10 +86,11 @@ export class AmbulancesService {
       SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
           "locationLat" = $2,
           "locationLng" = $1,
+          "locationAltitude" = $4,
           "locationUpdatedAt" = NOW()
       WHERE id = $3
     `,
-      [dto.lng, dto.lat, id],
+      [dto.lng, dto.lat, id, dto.altitude || 0],
     );
   }
 

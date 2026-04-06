@@ -13,4 +13,8 @@ export class UpdateLocationDto {
   @Min(-180)
   @Max(180)
   lng: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  altitude?: number;
 }

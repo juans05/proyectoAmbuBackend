@@ -60,6 +60,9 @@ export class Emergency {
   @Column({ type: 'float' })
   userLng: number;
 
+  @Column({ type: 'float', nullable: true, default: 0 })
+  userAltitude: number;
+
   @Column({ type: 'text' })
   address: string;
 

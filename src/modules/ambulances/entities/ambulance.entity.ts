@@ -60,6 +60,9 @@ export class Ambulance {
   @Column({ type: 'float', nullable: true })
   locationLng: number;
 
+  @Column({ type: 'float', nullable: true, default: 0 })
+  locationAltitude: number;
+
   @Column({ nullable: true })
   locationUpdatedAt: Date;
 

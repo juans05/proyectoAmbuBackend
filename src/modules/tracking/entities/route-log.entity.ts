@@ -34,6 +34,9 @@ export class RouteLog {
   @Column({ type: 'float' })
   lng: number;
 
+  @Column({ type: 'float', nullable: true, default: 0 })
+  altitude: number;
+
   @Column({ type: 'float', nullable: true })
   heading: number;
 

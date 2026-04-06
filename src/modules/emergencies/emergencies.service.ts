@@ -58,6 +58,7 @@ export class EmergenciesService {
       userId,
       userLat: data.lat,
       userLng: data.lng,
+      userAltitude: data.altitude || 0,
       userLocation: {
         type: 'Point',
         coordinates: [data.lng, data.lat],

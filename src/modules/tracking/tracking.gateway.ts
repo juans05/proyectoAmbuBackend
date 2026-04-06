@@ -191,6 +191,7 @@ export class TrackingGateway
     data: {
       lat: number;
       lng: number;
+      altitude?: number;
       heading?: number;
       speed?: number;
       emergencyId?: string;
@@ -217,6 +218,7 @@ export class TrackingGateway
         .set({
           locationLat: data.lat,
           locationLng: data.lng,
+          locationAltitude: data.altitude || 0,
           locationUpdatedAt: () => 'NOW()',
           location: () => `ST_MakePoint(${data.lng}, ${data.lat})`,
         })
@@ -232,6 +234,7 @@ export class TrackingGateway
             ambulanceId,
             lat: data.lat,
             lng: data.lng,
+            altitude: data.altitude || 0,
             heading: data.heading,
             speed: data.speed,
             location: {
@@ -271,6 +274,7 @@ export class TrackingGateway
           ambulanceId,
           lat: data.lat,
           lng: data.lng,
+          altitude: data.altitude,
           heading: data.heading,
           speed: data.speed,
         });
@@ -283,6 +287,7 @@ export class TrackingGateway
       ambulanceId,
       lat: data.lat,
       lng: data.lng,
+      altitude: data.altitude,
       heading: data.heading,
       speed: data.speed,
     });

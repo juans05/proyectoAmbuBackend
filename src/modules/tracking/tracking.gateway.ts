@@ -103,10 +103,18 @@ export class TrackingGateway
 
       // Si es conductor, precargar su ambulanceId para ahorrar queries luego
       if (payload.role === 'conductor') {
-        const amb = await this.ambulanceRepo.findOne({
-          where: { conductorId: payload.sub },
-        });
-        if (amb) data.ambulanceId = amb.id;
+        try {
+          const amb = await this.ambulanceRepo.findOne({
+            where: { conductorId: payload.sub },
+          });
+          if (amb) data.ambulanceId = amb.id;
+        } catch (dbError) {
+          this.logger.error(
+            `Error al precargar ambulancia para conductor ${payload.sub}. Verifica si faltan columnas en la BD.`,
+            dbError,
+          );
+          // No desconectamos al cliente, permitimos que siga conectado aunque use menos optimización
+        }
       }
 
       client.data = data;

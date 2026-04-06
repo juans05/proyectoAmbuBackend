@@ -65,7 +65,7 @@ export class TrackingGateway
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      console.log("******************************************");
+      console.log("***********************s*******************");
       const auth = client.handshake.auth as Record<string, string | undefined>;
       const headers = client.handshake.headers as Record<
         string,

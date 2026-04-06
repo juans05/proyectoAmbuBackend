@@ -277,13 +277,14 @@ export class TrackingGateway
     }
 
     // EMISION GLOBAL (Dashboard): Para que el mapa administrativo vea el movimiento en tiempo real
+    // No enviamos status aquí — el dashboard mantiene el status real desde la última carga/polling.
+    // Hardcodear 'available' era incorrecto: mostraba ambulancias en_ruta como verdes.
     this.server.emit(SocketEvents.AMBULANCE_LOCATION, {
       ambulanceId,
       lat: data.lat,
       lng: data.lng,
       heading: data.heading,
       speed: data.speed,
-      status: AmbulanceStatus.AVAILABLE, // Forzar visualización como disponible si está en movimiento
     });
 
     this.logger.log(

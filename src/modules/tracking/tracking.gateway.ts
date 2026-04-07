@@ -71,8 +71,10 @@ export class TrackingGateway
         string,
         string | undefined
       >;
+      const query = client.handshake.query as Record<string, string | undefined>;
+
       const rawToken: string | undefined =
-        auth['token'] ?? headers['authorization'];
+        auth['token'] ?? headers['authorization'] ?? query['token'];
 
       const token: string | undefined = rawToken?.startsWith('Bearer ')
         ? rawToken.slice(7)
@@ -133,14 +135,20 @@ export class TrackingGateway
       this.userToSocket.set(payload.sub, client.id);
 
       this.logger.debug(
-        `Cliente conectado: ${client.id} (userId: ${payload.sub})`,
+        `Cliente conectado con éxito: ${client.id} (userId: ${payload.sub})`,
       );
     } catch (error: any) {
-      this.logger.warn(
-        `Conexión rechazada (token inválido): ${client.id} - Razón: ${error.message || 'Desconocida'
-        }`,
+      const isAuthError = error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError';
+      
+      this.logger.error(
+        `Error en handleConnection para cliente ${client.id}: ${error.message}`,
+        error.stack,
       );
-      client.disconnect(true);
+
+      // Solo desconectar si es realmente un error de Token
+      if (isAuthError) {
+        client.disconnect(true);
+      }
     }
   }
 

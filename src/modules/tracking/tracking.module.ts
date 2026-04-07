@@ -27,13 +27,23 @@ import { RouteLog } from './entities/route-log.entity';
     {
       provide: Redis,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) =>
-        new Redis({
-          host: config.get<string>('redis.host') || 'localhost',
-          port: config.get<number>('redis.port') || 6379,
-          password: config.get<string>('redis.password') || undefined,
+      useFactory: (config: ConfigService) => {
+        const url = config.get<string>('redis.url');
+        const host = config.get<string>('redis.host');
+        const port = config.get<number>('redis.port');
+        const password = config.get<string>('redis.password');
+
+        if (url) {
+          return new Redis(url, { lazyConnect: true });
+        }
+
+        return new Redis({
+          host: host || 'localhost',
+          port: port || 6379,
+          password: password || undefined,
           lazyConnect: true,
-        }),
+        });
+      },
     },
   ],
   exports: [TrackingGateway, RouteAnalyticsService],

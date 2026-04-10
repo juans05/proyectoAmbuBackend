@@ -30,11 +30,13 @@ export class PriorityEngineService {
       const radius = 400; // metros
 
       // Búsqueda espacial de la intersección más cercana (PostGIS)
-      const result = await this.dataSource.query<Array<{ id: string; name: string; distance: number }>>(
+      const result = await this.dataSource.query<Array<{ id: string; name: string; lat: number; lng: number; distance: number }>>(
         `
         SELECT
           id,
           name,
+          lat,
+          lng,
           ST_Distance(
             location::geography,
             ST_MakePoint($2, $1)::geography
@@ -64,11 +66,18 @@ export class PriorityEngineService {
             `[PRIORITY ACTIVE] Ambulancia ${ambulanceId} llegando a ${intersection.name}. Activando túnel virtual.`,
           );
 
-          // Emitir a la sala de la emergencia
+          // Emitir a la sala de la emergencia con formato alineado al Mobile
           server.to(`emergency_${emergencyId}`).emit('traffic_priority_active', {
             ambulanceId,
-            intersectionId: intersection.id,
-            intersectionName: intersection.name,
+            signalIds: [intersection.id],
+            signals: [
+              {
+                id: intersection.id,
+                name: intersection.name,
+                lat: result[0].lat || 0, // Necesitamos asegurar que lat/lng vayan en el obj
+                lng: result[0].lng || 0,
+              },
+            ],
             type: IntersectionType.TRAFFIC_LIGHT,
             status: 'clearing',
           });

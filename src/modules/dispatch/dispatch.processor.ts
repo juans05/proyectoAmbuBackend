@@ -2,6 +2,7 @@ import { Processor, Process } from '@nestjs/bull';
 import { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { Logger } from '@nestjs/common';
 import { DISPATCH_QUEUE } from '../../common/constants/queues.constant';
 import { SocketEvents } from '../../common/constants/socket-events.constant';
 import { Ambulance } from '../ambulances/entities/ambulance.entity';
@@ -22,10 +23,12 @@ interface AmbulanceQueryRow {
 }
 import { NotificationsService } from '../notifications/notifications.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
-import { RoutingService } from './routing.service';
+import { RoutingService, RoutingProvider } from './routing.service';
 
 @Processor(DISPATCH_QUEUE)
 export class DispatchProcessor {
+  private readonly logger = new Logger(DispatchProcessor.name);
+
   constructor(
     @InjectRepository(Ambulance)
     private readonly ambulanceRepo: Repository<Ambulance>,
@@ -76,7 +79,7 @@ export class DispatchProcessor {
           $3
         )
       ORDER BY distance_meters ASC
-      LIMIT 1
+      LIMIT 5
     `,
       [emergency.userLat, emergency.userLng, maxRadius],
     );
@@ -99,23 +102,44 @@ export class DispatchProcessor {
       return;
     }
 
-    const ambulance = result[0];
+    // 3. SELECCIÓN INTELIGENTE: Comparar ETA real (tráfico) de los candidatos
+    this.logger.log(`Evaluating traffic for ${result.length} ambulance candidates for emergency ${emergencyId}`);
+    
+    const evaluationPromises = result.map(async (candidate) => {
+      try {
+        const directions = await this.routingService.getDirections(
+          { lat: candidate.locationLat, lng: candidate.locationLng },
+          { lat: emergency.userLat, lng: emergency.userLng },
+          RoutingProvider.GOOGLE, // Forzamos Google para tener tráfico real en la comparativa
+          'TRAFFIC_AWARE_OPTIMAL'
+        );
+        return {
+          ...candidate,
+          etaMinutes: Math.ceil(directions.durationSeconds / 60),
+          polyline: directions.polyline,
+          durationSeconds: directions.durationSeconds,
+        };
+      } catch (error) {
+        // Fallback a OSRM o cálculo lineal si Google falla para este candidato
+        const linearEta = Math.ceil(candidate.distance_meters / 500); // ~30km/h
+        return {
+          ...candidate,
+          etaMinutes: linearEta,
+          polyline: '',
+          durationSeconds: linearEta * 60,
+        };
+      }
+    });
 
-    // 3. Calcular ruta inteligente (Google TRAFFIC_AWARE_OPTIMAL para emergencias activas)
-    let eta = Math.ceil(ambulance.distance_meters / 500); 
-    let polyline = '';
-    try {
-      const directions = await this.routingService.getDirections(
-        { lat: ambulance.locationLat, lng: ambulance.locationLng },
-        { lat: emergency.userLat, lng: emergency.userLng },
-        undefined, // Auto-pick (will pick Google for TRAFFIC_AWARE_OPTIMAL if requested)
-        'TRAFFIC_AWARE_OPTIMAL'
-      );
-      eta = Math.ceil(directions.durationSeconds / 60);
-      polyline = directions.polyline;
-    } catch {
-      // Fallback a OSRM si Google falla o no hay API Key
-    }
+    const evaluatedCandidates = await Promise.all(evaluationPromises);
+    
+    // Ordenar por duración real (orden ascendente)
+    evaluatedCandidates.sort((a, b) => a.durationSeconds - b.durationSeconds);
+    
+    const ambulance = evaluatedCandidates[0];
+    const { etaMinutes: eta, polyline } = ambulance;
+
+    this.logger.log(`Optimal ambulance selected: ${ambulance.plate} (ETA: ${eta} min, GeoDistance: ${Math.round(ambulance.distance_meters)}m)`);
 
     // 4. Asignar ambulancia — transacción para evitar doble asignación
     await this.dataSource.transaction(async (manager) => {

@@ -10,4 +10,5 @@ export const SocketEvents = {
   STATUS_CHANGE: 'status_change',
   NO_AMBULANCE: 'no_ambulance_available',
   NEW_EMERGENCY: 'new_emergency',
+  TRAFFIC_PRIORITY_ACTIVE: 'traffic_priority_active',
 };

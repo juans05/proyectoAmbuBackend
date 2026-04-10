@@ -79,7 +79,7 @@ export class DispatchProcessor {
           $3
         )
       ORDER BY distance_meters ASC
-      LIMIT 5
+      LIMIT 3
     `,
       [emergency.userLat, emergency.userLng, maxRadius],
     );
@@ -104,14 +104,26 @@ export class DispatchProcessor {
 
     // 3. SELECCIÓN INTELIGENTE: Comparar ETA real (tráfico) de los candidatos
     this.logger.log(`Evaluating traffic for ${result.length} ambulance candidates for emergency ${emergencyId}`);
-    
+
+    const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms),
+        ),
+      ]);
+
     const evaluationPromises = result.map(async (candidate) => {
+      // Intentar con Google Maps (timeout 5s)
       try {
-        const directions = await this.routingService.getDirections(
-          { lat: candidate.locationLat, lng: candidate.locationLng },
-          { lat: emergency.userLat, lng: emergency.userLng },
-          RoutingProvider.GOOGLE, // Forzamos Google para tener tráfico real en la comparativa
-          'TRAFFIC_AWARE_OPTIMAL'
+        const directions = await withTimeout(
+          this.routingService.getDirections(
+            { lat: candidate.locationLat, lng: candidate.locationLng },
+            { lat: emergency.userLat, lng: emergency.userLng },
+            RoutingProvider.GOOGLE,
+            'TRAFFIC_AWARE_OPTIMAL',
+          ),
+          5000,
         );
         return {
           ...candidate,
@@ -119,15 +131,30 @@ export class DispatchProcessor {
           polyline: directions.polyline,
           durationSeconds: directions.durationSeconds,
         };
-      } catch (error) {
-        // Fallback a OSRM o cálculo lineal si Google falla para este candidato
-        const linearEta = Math.ceil(candidate.distance_meters / 500); // ~30km/h
-        return {
-          ...candidate,
-          etaMinutes: linearEta,
-          polyline: '',
-          durationSeconds: linearEta * 60,
-        };
+      } catch {
+        // Google falló o tardó >5s — usar OSRM como fallback real
+        try {
+          const directions = await this.routingService.getDirections(
+            { lat: candidate.locationLat, lng: candidate.locationLng },
+            { lat: emergency.userLat, lng: emergency.userLng },
+            RoutingProvider.OSRM,
+          );
+          return {
+            ...candidate,
+            etaMinutes: Math.ceil(directions.durationSeconds / 60),
+            polyline: directions.polyline,
+            durationSeconds: directions.durationSeconds,
+          };
+        } catch {
+          // OSRM también falló — estimación conservadora basada en distancia
+          const conservativeEta = Math.ceil(candidate.distance_meters / 333); // ~20km/h urbano
+          return {
+            ...candidate,
+            etaMinutes: conservativeEta,
+            polyline: '',
+            durationSeconds: conservativeEta * 60,
+          };
+        }
       }
     });
 

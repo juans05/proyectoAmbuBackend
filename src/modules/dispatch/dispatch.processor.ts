@@ -22,7 +22,7 @@ interface AmbulanceQueryRow {
 }
 import { NotificationsService } from '../notifications/notifications.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
-import { GoogleMapsService } from '../../common/utils/google-maps.service';
+import { RoutingService } from './routing.service';
 
 @Processor(DISPATCH_QUEUE)
 export class DispatchProcessor {
@@ -33,7 +33,7 @@ export class DispatchProcessor {
     private readonly emergencyRepo: Repository<Emergency>,
     private readonly notificationsService: NotificationsService,
     private readonly trackingGateway: TrackingGateway,
-    private readonly googleMapsService: GoogleMapsService,
+    private readonly routingService: RoutingService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -50,7 +50,6 @@ export class DispatchProcessor {
     if (!emergency || emergency.status !== EmergencyStatus.PENDING) return;
 
     // 2. Buscar ambulancia más cercana con PostGIS
-    // CRÍTICO: PostGIS usa (lng, lat) — NO (lat, lng)
     const result = await this.dataSource.query<AmbulanceQueryRow[]>(
       `
       SELECT
@@ -83,46 +82,39 @@ export class DispatchProcessor {
     );
 
     if (!result.length) {
-      // No hay ambulancia disponible — reintentar con radio mayor (BullMQ retry)
+      // No hay ambulancia disponible — reintentar
       if (attempt < 3) {
-        // Encolar nuevo intento
         await job.queue.add(
           'dispatch_emergency',
-          {
-            emergencyId,
-            attempt: attempt + 1,
-          },
+          { emergencyId, attempt: attempt + 1 },
           { delay: 5000 },
         );
         return;
       }
-      // Notificar al usuario que no hay ambulancias disponibles
       await this.emergencyRepo.update(emergencyId, {
         status: EmergencyStatus.CANCELLED,
         cancelReason: 'Sin ambulancias disponibles',
       });
-      this.trackingGateway.emitToEmergency(
-        emergencyId,
-        SocketEvents.NO_AMBULANCE,
-        {},
-      );
+      this.trackingGateway.emitToEmergency(emergencyId, SocketEvents.NO_AMBULANCE, {});
       return;
     }
 
     const ambulance = result[0];
 
-    // 3. Calcular ruta real y ETA con Google Maps
-    let eta = Math.ceil(ambulance.distance_meters / 500); // fallback: 500m/min
+    // 3. Calcular ruta inteligente (Google TRAFFIC_AWARE_OPTIMAL para emergencias activas)
+    let eta = Math.ceil(ambulance.distance_meters / 500); 
     let polyline = '';
     try {
-      const directions = await this.googleMapsService.getDirections(
+      const directions = await this.routingService.getDirections(
         { lat: ambulance.locationLat, lng: ambulance.locationLng },
         { lat: emergency.userLat, lng: emergency.userLng },
+        undefined, // Auto-pick (will pick Google for TRAFFIC_AWARE_OPTIMAL if requested)
+        'TRAFFIC_AWARE_OPTIMAL'
       );
       eta = Math.ceil(directions.durationSeconds / 60);
       polyline = directions.polyline;
     } catch {
-      /* usar fallback si Google Maps falla */
+      // Fallback a OSRM si Google falla o no hay API Key
     }
 
     // 4. Asignar ambulancia — transacción para evitar doble asignación

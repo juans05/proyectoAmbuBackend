@@ -17,10 +17,12 @@ export class GoogleMapsService {
 
   /**
    * Obtiene la polilínea y metadata de la ruta más rápida entre dos puntos.
+   * Utiliza la moderna Routes API v2 con preferencia de tráfico óptima.
    */
   async getDirections(
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number },
+    preference: 'TRAFFIC_AWARE' | 'TRAFFIC_AWARE_OPTIMAL' = 'TRAFFIC_AWARE',
   ): Promise<{
     polyline: string;
     durationSeconds: number;
@@ -30,41 +32,61 @@ export class GoogleMapsService {
       this.logger.warn('Google Maps API Key no configurada. Usando fallback.');
       const distance = this.calculateDistance(origin, destination);
       return {
-        polyline: '', // No hay polilínea sin API
-        durationSeconds: Math.ceil(distance / 8.33) * 60, // 8.33 m/s (~30km/h)
+        polyline: '', 
+        durationSeconds: Math.ceil(distance / 8.33) * 60,
         distanceMeters: distance,
       };
     }
 
     try {
       const response = await lastValueFrom(
-        this.httpService.get('https://maps.googleapis.com/maps/api/directions/json', {
-          params: {
-            origin: `${origin.lat},${origin.lng}`,
-            destination: `${destination.lat},${destination.lng}`,
-            key: this.apiKey,
-            mode: 'driving',
-            traffic_model: 'best_guess',
-            departure_time: 'now',
+        this.httpService.post(
+          'https://routes.googleapis.com/directions/v2:computeRoutes',
+          {
+            origin: {
+              location: { latLng: { latitude: origin.lat, longitude: origin.lng } },
+            },
+            destination: {
+              location: { latLng: { latitude: destination.lat, longitude: destination.lng } },
+            },
+            travelMode: 'DRIVE',
+            routingPreference: preference,
+            computeAlternativeRoutes: false,
+            routeModifiers: {
+              avoidTolls: false,
+              avoidHighways: false,
+              avoidFerries: false,
+            },
+            languageCode: 'es-PE',
+            units: 'METRIC',
           },
-        }),
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': this.apiKey,
+              'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+            },
+          },
+        ),
       );
 
       const data = response.data;
-      if (data.status !== 'OK' || !data.routes.length) {
-        throw new Error(`Google Directions Error: ${data.status}`);
+      if (!data.routes || !data.routes.length) {
+        throw new Error(`Google Routes v2 Error: No routes found`);
       }
 
       const route = data.routes[0];
-      const leg = route.legs[0];
 
       return {
-        polyline: route.overview_polyline.points,
-        durationSeconds: leg.duration_in_traffic?.value ?? leg.duration.value,
-        distanceMeters: leg.distance.value,
+        polyline: route.polyline.encodedPolyline,
+        durationSeconds: parseInt(route.duration.replace('s', ''), 10),
+        distanceMeters: route.distanceMeters,
       };
     } catch (error) {
-      this.logger.error('Error al obtener direcciones de Google', error);
+      this.logger.error(
+        'Error al obtener direcciones de Google Routes v2',
+        error.response?.data || error.message,
+      );
       const distance = this.calculateDistance(origin, destination);
       return {
         polyline: '',

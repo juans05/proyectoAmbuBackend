@@ -30,6 +30,8 @@ import { AmbulanceStatus } from '../../common/enums/ambulance-status.enum';
 import { SocketEvents } from '../../common/constants/socket-events.constant';
 import { RouteLog } from './entities/route-log.entity';
 
+import { PriorityEngineService } from './priority-engine.service';
+
 @WebSocketGateway({
   namespace: '/tracking',
   cors: { origin: '*' },
@@ -55,6 +57,7 @@ export class TrackingGateway
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisClient: Redis,
+    private readonly priorityEngine: PriorityEngineService,
     @InjectRepository(Ambulance)
     private readonly ambulanceRepo: Repository<Ambulance>,
     @InjectRepository(RouteLog)
@@ -219,13 +222,20 @@ export class TrackingGateway
     if (!userId) return;
 
     // Throttle: máx 1 update por segundo por conductor
-    const throttleKey = `throttle:location:${userId}`;
-    const exists = await this.redisClient.exists(throttleKey);
-    if (exists) {
-      // Silenciosamente ignorar — no enviar error al cliente para no saturar
-      return;
+    try {
+      const throttleKey = `throttle:location:${userId}`;
+      const exists = await this.redisClient.exists(throttleKey);
+      if (exists) {
+        // Silenciosamente ignorar — no enviar error al cliente para no saturar
+        return;
+      }
+      await this.redisClient.set(throttleKey, '1', 'PX', 1000);
+    } catch (redisError) {
+      this.logger.error(
+        `Error en el throttle de Redis para conductor ${userId}. Continuando sin throttle.`,
+        redisError,
+      );
     }
-    await this.redisClient.set(throttleKey, '1', 'PX', 1000);
 
     // Persistir ubicación en BD (PostGIS: ST_MakePoint(lng, lat))
     try {
@@ -246,6 +256,7 @@ export class TrackingGateway
       if (data.emergencyId) {
         const ambulanceId = (client.data as SocketData)?.ambulanceId;
         if (ambulanceId) {
+          // 1. Guardar log
           void this.routeLogRepo.save({
             emergencyId: data.emergencyId,
             ambulanceId,
@@ -259,6 +270,15 @@ export class TrackingGateway
               coordinates: [data.lng, data.lat],
             },
           });
+
+          // 2. Priority Logic: Verificar semáforos
+          void this.priorityEngine.checkPriority(
+            ambulanceId,
+            data.lat,
+            data.lng,
+            data.emergencyId,
+            this.server,
+          );
         }
       }
     } catch (err) {

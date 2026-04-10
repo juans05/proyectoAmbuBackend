@@ -28,7 +28,7 @@ export class EmergenciesService {
   ) {}
 
   async create(userId: string, data: CreateEmergencyDto) {
-    // ── Rate limiting: máx 3 emergencias por usuario por hora ──
+    // ── Rate limiting: Aumentado de 3 a 100 para pruebas de carga y QA ──
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const recentCount = await this.emergencyRepo.count({
       where: {
@@ -36,9 +36,9 @@ export class EmergenciesService {
         createdAt: MoreThan(oneHourAgo),
       },
     });
-    if (recentCount >= 3) {
+    if (recentCount >= 100) {
       throw new BadRequestException(
-        'Has alcanzado el límite de 3 emergencias por hora. Por favor, espera antes de crear una nueva.',
+        'Has alcanzado el límite de 100 emergencias por hora (Modo Pruebas).',
       );
     }
 
@@ -69,8 +69,14 @@ export class EmergenciesService {
       emergency,
     )) as unknown as Emergency;
 
-    // El "Corazón": activar el despacho automático en segundo plano
-    await this.dispatchService.dispatchEmergency(saved.id);
+    // El "Corazón": activar el despacho automático en segundo plano (SIN esperar para evitar Timeouts)
+    this.dispatchService.dispatchEmergency(saved.id).catch((err) => {
+      // Usamos console.error para visibilidad rápida en logs de producción
+      console.error(
+        `[EmergenciesService] Error CRÍTICO al encolar despacho p/ ${saved.id}:`,
+        err,
+      );
+    });
 
     return saved;
   }

@@ -193,7 +193,7 @@ export class DispatchProcessor {
       // Bloquear fila para evitar condición de carrera
       const locked = await manager.query<Array<{ id: string }>>(
         `
-        SELECT id FROM ambulances WHERE id = $1 AND status = 'available'
+        SELECT id FROM "${schema}".ambulances WHERE id = $1 AND status = 'available'
         FOR UPDATE SKIP LOCKED
       `,
         [ambulance.id],

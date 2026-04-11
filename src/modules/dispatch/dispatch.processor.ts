@@ -74,16 +74,16 @@ export class DispatchProcessor {
         u."fcmToken",
         u.name as conductor_name,
         ST_Distance(
-          a.location::geography,
+          ST_SetSRID(ST_MakePoint(a."locationLng", a."locationLat"), 4326)::geography,
           ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
         ) AS distance_meters
       FROM ambulances a
-      INNER JOIN users u ON u.id = a."conductorId"
+      LEFT JOIN users u ON u.id = a."conductorId"
       WHERE a.status = 'available'
         AND a."isActive" = true
-        AND a.location IS NOT NULL
+        AND a."locationLat" IS NOT NULL
         AND ST_DWithin(
-          a.location::geography,
+          ST_SetSRID(ST_MakePoint(a."locationLng", a."locationLat"), 4326)::geography,
           ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
           $3
         )
@@ -92,6 +92,11 @@ export class DispatchProcessor {
     `,
       [emergency.userLat, emergency.userLng, maxRadius],
     );
+
+    // Validar si encontramos ambulancias pero sin usuario (Data Integrity error)
+    if (result.length > 0 && !result[0].conductor_name) {
+        this.logger.error(`CRÍTICO: Se encontró la ambulancia ${result[0].plate} pero su conductor (${result[0].conductorId}) NO existe en la base de datos. ELIMINANDO FILTRO DE DISPONIBILIDAD.`);
+    }
 
     if (!result.length) {
       this.logger.warn(`No ambulance found in radius ${maxRadius}m (Attempt ${attempt}/3). Emergency pos: [${emergency.userLat}, ${emergency.userLng}]`);

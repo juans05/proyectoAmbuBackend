@@ -53,6 +53,15 @@ export class DispatchProcessor {
     if (!emergency || emergency.status !== EmergencyStatus.PENDING) return;
 
     // 2. Buscar ambulancia más cercana con PostGIS
+    this.logger.debug(`Searching for ambulances within ${maxRadius/1000}km for emergency at [${emergency.userLat}, ${emergency.userLng}]`);
+    
+    // Log diagnóstico detallado: listar todas las ambulancias 'available'
+    const availableAmbs = await this.ambulanceRepo.find({ where: { status: AmbulanceStatus.AVAILABLE, isActive: true } });
+    this.logger.debug(`Found ${availableAmbs.length} available ambulances in DB total.`);
+    availableAmbs.forEach(amb => {
+      this.logger.debug(`Ambulance ${amb.plate}: Lat=${amb.locationLat}, Lng=${amb.locationLng}, HasLocation=${!!amb.location}`);
+    });
+
     const result = await this.dataSource.query<AmbulanceQueryRow[]>(
       `
       SELECT
@@ -85,6 +94,7 @@ export class DispatchProcessor {
     );
 
     if (!result.length) {
+      this.logger.warn(`No ambulance found in radius ${maxRadius}m (Attempt ${attempt}/3). Emergency pos: [${emergency.userLat}, ${emergency.userLng}]`);
       // No hay ambulancia disponible — reintentar
       if (attempt < 3) {
         await job.queue.add(
@@ -94,6 +104,7 @@ export class DispatchProcessor {
         );
         return;
       }
+      this.logger.error(`Dispatch failed for ${emergencyId}: No ambulances available within 20km`);
       await this.emergencyRepo.update(emergencyId, {
         status: EmergencyStatus.CANCELLED,
         cancelReason: 'Sin ambulancias disponibles',
@@ -235,6 +246,13 @@ export class DispatchProcessor {
       polyline, // Incluir la ruta para que el cliente la dibuje
       ambulanceLat: ambulance.locationLat,
       ambulanceLng: ambulance.locationLng,
+    });
+
+    // 8. NOTIFICACIÓN GLOBAL (Dashboard): Forzar parpadeo y actualización de mapa
+    this.trackingGateway.emitToAll('status_change', {
+      ambulanceId: ambulance.id,
+      emergencyId,
+      status: AmbulanceStatus.ON_ROUTE,
     });
   }
 }

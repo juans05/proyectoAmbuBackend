@@ -3,6 +3,7 @@ import { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DISPATCH_QUEUE } from '../../common/constants/queues.constant';
 import { SocketEvents } from '../../common/constants/socket-events.constant';
 import { Ambulance } from '../ambulances/entities/ambulance.entity';
@@ -38,6 +39,7 @@ export class DispatchProcessor {
     private readonly trackingGateway: TrackingGateway,
     private readonly routingService: RoutingService,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
   ) {}
 
   @Process('dispatch_emergency')
@@ -62,6 +64,8 @@ export class DispatchProcessor {
       this.logger.debug(`Ambulance ${amb.plate}: Lat=${amb.locationLat}, Lng=${amb.locationLng}, HasLocation=${!!amb.location}`);
     });
 
+    const schema = this.configService.get<string>('DB_SCHEMA') || 'public';
+
     const result = await this.dataSource.query<AmbulanceQueryRow[]>(
       `
       SELECT
@@ -77,8 +81,8 @@ export class DispatchProcessor {
           ST_SetSRID(ST_MakePoint(a."locationLng", a."locationLat"), 4326)::geography,
           ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
         ) AS distance_meters
-      FROM ambulances a
-      LEFT JOIN users u ON u.id = a."conductorId"
+      FROM "${schema}".ambulances a
+      LEFT JOIN "${schema}".users u ON u.id = a."conductorId"
       WHERE a.status = 'available'
         AND a."isActive" = true
         AND a."locationLat" IS NOT NULL

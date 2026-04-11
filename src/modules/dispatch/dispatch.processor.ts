@@ -75,7 +75,7 @@ export class DispatchProcessor {
         u.name as conductor_name,
         ST_Distance(
           a.location::geography,
-          ST_MakePoint($2, $1)::geography
+          ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
         ) AS distance_meters
       FROM ambulances a
       INNER JOIN users u ON u.id = a."conductorId"
@@ -84,7 +84,7 @@ export class DispatchProcessor {
         AND a.location IS NOT NULL
         AND ST_DWithin(
           a.location::geography,
-          ST_MakePoint($2, $1)::geography,
+          ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
           $3
         )
       ORDER BY distance_meters ASC
@@ -246,6 +246,12 @@ export class DispatchProcessor {
       polyline, // Incluir la ruta para que el cliente la dibuje
       ambulanceLat: ambulance.locationLat,
       ambulanceLng: ambulance.locationLng,
+    });
+
+    // 7.1 NOTIFICACIÓN GLOBAL PARA EL DASHBOARD (Parpadeo)
+    this.trackingGateway.emitToAll('emergency_assigned', {
+        emergencyId,
+        ambulancePlate: ambulance.plate
     });
 
     // 8. NOTIFICACIÓN GLOBAL (Dashboard): Forzar parpadeo y actualización de mapa

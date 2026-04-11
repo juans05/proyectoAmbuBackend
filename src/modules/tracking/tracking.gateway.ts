@@ -247,7 +247,7 @@ export class TrackingGateway
           locationLng: data.lng,
           locationAltitude: data.altitude || 0,
           locationUpdatedAt: () => 'NOW()',
-          location: () => `ST_MakePoint(${data.lng}, ${data.lat})`,
+          location: () => `ST_SetSRID(ST_MakePoint(${data.lng}, ${data.lat}), 4326)`,
         })
         .where('"conductorId" = :userId', { userId })
         .execute();
